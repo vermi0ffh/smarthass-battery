@@ -1,0 +1,8 @@
+# Accepted deviations from a rule of AGENTS.md, applied mechanically to the findings after the review (they are
+# never shown to the agents). The findings of a non-derogable axis (security) are never dismissed.
+#
+# derogations:
+#   - rule: rule-8                  # an identifier of AGENTS.md (rule-<n>)
+#     paths: ["tools/simulator/*"]  # fnmatch patterns on the repository path, '*' also matches '/'; none = everywhere
+#     reason: why the project accepts this deviation
+derogations: []
