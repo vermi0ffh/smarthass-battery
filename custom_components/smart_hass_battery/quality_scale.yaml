@@ -8,8 +8,8 @@ rules:
     status: exempt
     comment: No polling; the tracker follows the source entities' state changes and refreshes every minute.
   brands:
-    status: todo
-    comment: Icon and logo to add in brand/ before the first release.
+    status: done
+    comment: Icon and logo (light and dark) in brand/, served by Home Assistant itself for custom integrations.
   common-modules: done
   config-flow-test-coverage: done
   config-flow: done
