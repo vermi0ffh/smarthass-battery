@@ -2,6 +2,7 @@
 it: each recorded state change updates the model with the latest value of every input."""
 
 import gzip
+from bisect import bisect_right
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
@@ -46,14 +47,7 @@ class Flows:
     discharged_kwh: list[float]
 
     def at(self, t: datetime) -> tuple[float, float]:
-        lo, hi = 0, len(self.times)
-        while lo < hi:
-            mid = (lo + hi) // 2
-            if self.times[mid] <= t:
-                lo = mid + 1
-            else:
-                hi = mid
-        i = max(lo - 1, 0)
+        i = max(bisect_right(self.times, t) - 1, 0)
         return self.charged_kwh[i], self.discharged_kwh[i]
 
 

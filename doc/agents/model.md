@@ -24,8 +24,9 @@ kWh still there at "11 %"). Its total is right (17.5 kWh from 100 % to 9 %): it 
 ## Counting
 
 `update(at, reading)` first counts the interval since the previous update at the power **then** in force (held: Home
-Assistant records a state only when it changes), then takes `reading`. A reading older than the last update counts
-no interval.
+Assistant records a state only when it changes), then takes `reading`. A reading older than the last update is
+ignored (events out of order: the newer one already holds the inputs); a non-finite value (nan, inf) is unavailable:
+no divergence check would catch a nan.
 
 - **With a power** (`has_power`, DC, positive while charging): the flows are its integral. An unavailable power
   pauses the counting; with energy meters (`has_meters`), the meters count what the gap missed at their next
@@ -75,6 +76,10 @@ complete when it started at a landmark seen and every flow of it was seen).
 A landmark told by the user (`mark_full`, `mark_empty`) ends and starts no learned cycle; `set_energy` restarts the
 counting but not the cycles (the flows are still seen).
 
+`BatteryConfig` refuses (`ValueError`) a configuration without energy between the landmarks (an empty threshold
+outside 0–100 %, a nil capacity or full energy), a nil or impossible round trip, a nil maximum power: the config flow
+will check the same first.
+
 Defaults: `efficiency` 0.96 (0.964 measured over 8 daily cycles), `full_energy_kwh` the nominal capacity above the
 empty threshold (17.47 kWh for 19.2 kWh at 9 %; 17.2 learned on the recording).
 
@@ -87,7 +92,7 @@ cycles in progress are incomplete).
 
 ## Persistence
 
-`state_to_dict` / `state_from_dict`, format `STATE_VERSION` (1). A missing or unreadable field takes its default; an
+`state_to_dict` / `state_from_dict`, format `STATE_VERSION` (1, written as `version`; absent = 1). A missing or unreadable field takes its default; an
 unreadable estimate or start makes the estimate unknown (it starts again from the state of charge), an unreadable
 cycle is incomplete, unreadable learned totals are dropped.
 
@@ -116,4 +121,5 @@ learned separately. The losses of the inverters (AC side) are out of the model: 
 `meter.py`: `meter_delta(previous, current, max_delta)`, what a cumulative meter counted between two readings
 (rule 12): a drop below half the previous value is a reset (the inverters' daily energy counters at midnight) and the
 new value counts fully; a smaller drop is jitter and counts nothing; an increase beyond `max_delta` (more than the
-battery's power allows since the previous reading) is a spurious value; an unavailable reading counts nothing.
+battery's power allows since the previous reading: `max_power_kw`, 30 kW by default, plus a minute) is a spurious
+value; an unavailable reading counts nothing. A reading with only one of the two meters keeps both bases.

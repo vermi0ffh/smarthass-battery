@@ -54,12 +54,14 @@ def replay(recorded: list[Event], recorded_flows: Flows, config: BatteryConfig) 
     crossings = empty_crossings(recorded, EMPTY_SOC_PCT)
     eta = round_trip(recorded, recorded_flows)
     samples, landmarks = [], []
+    soc: float | None = None
     due = recorded[0].at.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
     for event in recorded:
         while event.at >= due:
-            if crossings[0] <= due < crossings[-1] and battery.energy_kwh is not None:
-                samples.append(sample(due, battery, recorded_flows, crossings, eta))
+            if crossings[0] <= due < crossings[-1] and battery.energy_kwh is not None and soc is not None:
+                samples.append(sample(due, battery.energy_kwh, soc, recorded_flows, crossings, eta))
             due += timedelta(minutes=30)
+        soc = event.reading.soc_pct if event.reading.soc_pct is not None else soc
         before = battery.last_landmark_at
         battery.update(event.at, event.reading)
         if battery.last_landmark_at != before and battery.last_landmark is not None:
@@ -67,18 +69,18 @@ def replay(recorded: list[Event], recorded_flows: Flows, config: BatteryConfig) 
     return Replay(samples, battery, landmarks)
 
 
-def sample(at: datetime, battery: Battery, recorded_flows: Flows, crossings: list[datetime], eta: float) -> Sample:
+def sample(
+    at: datetime, estimate_kwh: float, soc_pct: float, recorded_flows: Flows, crossings: list[datetime], eta: float
+) -> Sample:
     following = next(t for t in crossings if t > at)
     (in0, out0), (in1, out1) = recorded_flows.at(at), recorded_flows.at(following)
     (in_before, out_before) = recorded_flows.at(at - timedelta(minutes=15))
     (in_after, out_after) = recorded_flows.at(at + timedelta(minutes=15))
     net = (in_after - in_before) - (out_after - out_before)
-    soc = battery.state.reading.soc_pct
-    assert soc is not None and battery.energy_kwh is not None
     return Sample(
         at,
-        battery.energy_kwh,
-        (soc - EMPTY_SOC_PCT) * NOMINAL_KWH / 100.0,
+        estimate_kwh,
+        (soc_pct - EMPTY_SOC_PCT) * NOMINAL_KWH / 100.0,
         (out1 - out0) - eta * (in1 - in0),
         1 if net > 0.05 else (-1 if net < -0.05 else 0),
     )
@@ -125,7 +127,8 @@ def test_the_state_of_charge_s_lead_and_lag_are_gone(house):
 
 def test_the_landmarks_of_the_recording(house):
     kinds = [kind for _, kind in house.landmarks]
-    # A cell at 3.50 V on the 4 nights charged to the top; the safety's 9 % every evening (three times on 11-03)
+    # A cell at 3.50 V on the 4 nights charged to the top, twice on 11-06 (2.1 kWh went out between the 01:50 and the
+    # 03:40 top-ups); the safety's 9 % every evening (three times on 11-03)
     assert kinds.count(FULL) == 5
     assert kinds.count(EMPTY) == 11
 
@@ -140,8 +143,8 @@ def test_what_the_recording_teaches_without_being_used(house):
 
 
 def test_learning_corrects_a_wrong_configuration(recorded, recorded_flows):
-    wrong = BatteryConfig(22.0, efficiency=0.92, has_meters=True)
-    fixed = replay(recorded, recorded_flows, wrong)
+    wrong_config = BatteryConfig(22.0, efficiency=0.92, has_meters=True)
+    uncorrected = replay(recorded, recorded_flows, wrong_config)
     learned = replay(recorded, recorded_flows, BatteryConfig(22.0, efficiency=0.92, has_meters=True, learn=True))
     assert learned.battery.efficiency == pytest.approx(0.964, abs=0.01)
     assert learned.battery.full_energy_kwh == pytest.approx(17.2, abs=0.4)
@@ -151,4 +154,4 @@ def test_learning_corrects_a_wrong_configuration(recorded, recorded_flows):
         return [s.estimate_kwh - s.truth_kwh for s in r.samples if s.at >= since]
 
     # Once learned (from the evening of 11-03): 0.80 kWh against 1.52
-    assert mae(late(learned)) < 0.7 * mae(late(fixed))
+    assert mae(late(learned)) < 0.7 * mae(late(uncorrected))

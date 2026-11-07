@@ -36,9 +36,8 @@ COUNTED_UNCERTAINTY = 0.02
 # (2 kWh measured), the counting has lost track (a meter missed a flow, a wrong efficiency)
 DIVERGENCE_KWH = 3.0
 
-# No home battery's DC flow exceeds this; a meter increase faster than it is a spurious value. One minute of slack
-# covers readings that arrive late.
-MAX_POWER_KW = 30.0
+# One minute of slack on the battery's maximum power (BatteryConfig.max_power_kw) covers meter readings that arrive
+# late
 METER_SLACK_H = 1 / 60
 
 # Learning. A cycle between two landmarks of the same kind gives the round trip (what came out over what went in)
@@ -80,9 +79,25 @@ class BatteryConfig:
     # The learned efficiency and full energy replace the configured ones once there are some (rule 25: off until
     # validated)
     learn: bool = False
+    # The battery's DC flow never exceeds this: a meter increase faster than it is a spurious value. 30 kW: above any
+    # home battery
+    max_power_kw: float = 30.0
+
+    def __post_init__(self) -> None:
+        # The energy between the landmarks divides the state of charge: a configuration without one is refused here
+        # rather than failing at every reading
+        if not 0.0 <= self.empty_soc_pct < 100.0:
+            raise ValueError(f"empty_soc_pct must be in [0, 100): {self.empty_soc_pct}")
+        if not self.configured_full_energy_kwh > 0.0:
+            raise ValueError(f"the energy between the landmarks must be positive: {self.configured_full_energy_kwh}")
+        if not 0.0 < self.efficiency <= MAX_EFFICIENCY:
+            raise ValueError(f"efficiency must be in (0, {MAX_EFFICIENCY}]: {self.efficiency}")
+        if not self.max_power_kw > 0.0:
+            raise ValueError(f"max_power_kw must be positive: {self.max_power_kw}")
 
     @property
-    def default_full_energy_kwh(self) -> float:
+    def configured_full_energy_kwh(self) -> float:
+        """The energy between the landmarks as configured (the learned one may replace it)."""
         if self.full_energy_kwh is not None:
             return self.full_energy_kwh
         return self.nominal_capacity_kwh * (100.0 - self.empty_soc_pct) / 100.0
@@ -150,6 +165,7 @@ def state_to_dict(state: BatteryState) -> dict[str, Any]:
     """The state as JSON-compatible data (persisted by the tracker, format STATE_VERSION)."""
     r = state.reading
     return {
+        "version": STATE_VERSION,
         "energy_kwh": state.energy_kwh,
         "start": state.start,
         "start_at": _iso(state.start_at),
@@ -183,8 +199,9 @@ def state_to_dict(state: BatteryState) -> dict[str, Any]:
 
 
 def state_from_dict(data: Any) -> BatteryState:
-    """The state persisted by state_to_dict. A missing or unreadable field (a truncated or edited file) takes its
-    default: the estimate then starts again from the state of charge rather than being wrong."""
+    """The state persisted by state_to_dict, of any version up to STATE_VERSION ("version"; 1 when absent). A
+    missing or unreadable field (a truncated or edited file) takes its default: the estimate then starts again from the
+    state of charge rather than being wrong."""
     if not isinstance(data, dict):
         return BatteryState()
     r = data.get("reading")
@@ -193,8 +210,11 @@ def state_from_dict(data: Any) -> BatteryState:
     start = start if start in (FULL, EMPTY, FROM_SOC, SET) else None
     energy = _float(data.get("energy_kwh"))
     kind = data.get("last_landmark_kind")
+    # Totals without one another are no ratio
     efficiency_in = _non_negative(data.get("efficiency_in_kwh"))
     efficiency_out = _non_negative(data.get("efficiency_out_kwh"))
+    has_ratio = efficiency_in > 0 and efficiency_out > 0
+    learned_full = _positive(data.get("learned_full_energy_kwh"))
     return BatteryState(
         energy_kwh=energy if start is not None else None,
         start=start if energy is not None else None,
@@ -219,14 +239,11 @@ def state_from_dict(data: Any) -> BatteryState:
         since_full=_cycle_from(data.get("since_full")),
         since_empty=_cycle_from(data.get("since_empty")),
         last_landmark_kind=kind if kind in LANDMARKS else None,
-        # Totals without one another are no ratio
-        efficiency_in_kwh=efficiency_in if efficiency_in > 0 and efficiency_out > 0 else 0.0,
-        efficiency_out_kwh=efficiency_out if efficiency_in > 0 and efficiency_out > 0 else 0.0,
-        efficiency_cycles=_count(data.get("efficiency_cycles")) if efficiency_in > 0 and efficiency_out > 0 else 0,
-        learned_full_energy_kwh=_positive(data.get("learned_full_energy_kwh")),
-        full_energy_cycles=_count(data.get("full_energy_cycles"))
-        if _positive(data.get("learned_full_energy_kwh")) is not None
-        else 0,
+        efficiency_in_kwh=efficiency_in if has_ratio else 0.0,
+        efficiency_out_kwh=efficiency_out if has_ratio else 0.0,
+        efficiency_cycles=_count(data.get("efficiency_cycles")) if has_ratio else 0,
+        learned_full_energy_kwh=learned_full,
+        full_energy_cycles=_count(data.get("full_energy_cycles")) if learned_full is not None else 0,
         last_landmark_error_kwh=_float(data.get("last_landmark_error_kwh")),
     )
 
@@ -340,7 +357,7 @@ class Battery:
         learned = self.state.learned_full_energy_kwh
         if self.config.learn and learned is not None and self.state.full_energy_cycles >= MIN_LEARNED_CYCLES:
             return learned
-        return self.config.default_full_energy_kwh
+        return self.config.configured_full_energy_kwh
 
     @property
     def last_landmark(self) -> str | None:
@@ -359,15 +376,21 @@ class Battery:
 
     def update(self, at: datetime, reading: Reading) -> None:
         """Counts the flows of the interval since the last update at the power then in force (held), then takes
-        `reading`: its meters' increases, its landmarks. A reading older than the last update counts no interval."""
+        `reading`: its meters' increases, its landmarks. A reading older than the last update is ignored (events out
+        of order: the newer one already holds the inputs); a non-finite value is unavailable."""
         state = self.state
-        if state.updated_at is not None and at > state.updated_at:
+        if state.updated_at is not None and at < state.updated_at:
+            return
+        reading = _finite(reading)
+        if state.updated_at is not None:
             self._integrate(state.updated_at, at, state.reading)
         self._take_meters(at, reading)
+        # The landmarks compare the new state of charge with the previous one (state.reading, replaced below); the
+        # check against the state of charge comes last, as it overrides a landmark that disagrees too far
         self._follow_landmarks(at, reading)
         self._check(at, reading)
         state.reading = reading
-        state.updated_at = at if state.updated_at is None else max(at, state.updated_at)
+        state.updated_at = at
 
     def resume(self) -> None:
         """After a restart: the power last read is not held over the downtime; the energy meters count it at their
@@ -393,7 +416,6 @@ class Battery:
     def mark_empty(self, at: datetime) -> None:
         """The user says the battery is at its empty landmark now."""
         self._restart(at, EMPTY, 0.0)
-        self.state.empty_armed = False
         self._miss_flows()
 
     def set_energy(self, at: datetime, energy_kwh: float) -> None:
@@ -415,8 +437,10 @@ class Battery:
             return
         kwh = held.power_w * (end - start).total_seconds() / 3.6e6
         charged, discharged = max(kwh, 0.0), max(-kwh, 0.0)
-        self.state.power_in_kwh += charged
-        self.state.power_out_kwh += discharged
+        if self.config.has_meters:
+            # What the meters' next increase is compared with, should the power fail meanwhile
+            self.state.power_in_kwh += charged
+            self.state.power_out_kwh += discharged
         self._flow(charged, discharged)
 
     def _take_meters(self, at: datetime, reading: Reading) -> None:
@@ -424,7 +448,7 @@ class Battery:
         state = self.state
         if reading.charged_kwh is None or reading.discharged_kwh is None:
             return
-        cap = MAX_POWER_KW * (_hours(state.meter_at, at) + METER_SLACK_H)
+        cap = self.config.max_power_kw * (_hours(state.meter_at, at) + METER_SLACK_H)
         charged = meter_delta(state.charged_meter_kwh, reading.charged_kwh, cap)
         discharged = meter_delta(state.discharged_meter_kwh, reading.discharged_kwh, cap)
         counted = state.charged_meter_kwh is not None and state.discharged_meter_kwh is not None
@@ -490,16 +514,16 @@ class Battery:
         self._restart(at, kind, self.full_energy_kwh if kind == FULL else 0.0)
         state.last_landmark_kind = kind
         if kind == FULL:
-            state.since_full, state.full_armed = Cycle(complete=True), False
+            state.since_full = Cycle(complete=True)
         else:
-            state.since_empty, state.empty_armed = Cycle(complete=True), False
+            state.since_empty = Cycle(complete=True)
 
     def _learn_efficiency(self, cycle: Cycle) -> None:
         """From one landmark to the next of the same kind, the battery is where it was: what came out over what went
         in is the round trip."""
         state = self.state
         charged, discharged = cycle.charged_kwh, cycle.discharged_kwh
-        if charged < MIN_CYCLE_FRACTION * self.config.default_full_energy_kwh or charged <= 0:
+        if charged < MIN_CYCLE_FRACTION * self.config.configured_full_energy_kwh or charged <= 0:
             return
         if MIN_EFFICIENCY <= discharged / charged <= MAX_EFFICIENCY:
             state.efficiency_in_kwh = CYCLE_DECAY * state.efficiency_in_kwh + charged
@@ -514,7 +538,7 @@ class Battery:
         state, eta = self.state, self.efficiency
         charged, discharged = cycle.charged_kwh, cycle.discharged_kwh
         sample = eta * charged - discharged if kind == FULL else discharged - eta * charged
-        reference = self.config.default_full_energy_kwh
+        reference = self.config.configured_full_energy_kwh
         if MIN_FULL_ENERGY_RATIO * reference <= sample <= MAX_FULL_ENERGY_RATIO * reference:
             learned = state.learned_full_energy_kwh
             state.learned_full_energy_kwh = (
@@ -528,12 +552,16 @@ class Battery:
         self.state.since_empty.complete = False
 
     def _restart(self, at: datetime, start: str, energy_kwh: float) -> None:
+        """The counting restarts from `start`; at a landmark, that landmark waits until the battery left it (armed
+        again in _flow for the full one, in _follow_landmarks for the empty one)."""
         state = self.state
         state.energy_kwh = energy_kwh
         state.start, state.start_at = start, at
         state.counted_kwh = 0.0
         if start == FULL:
             state.full_armed = False
+        elif start == EMPTY:
+            state.empty_armed = False
 
     def _from_soc(self, soc_pct: float) -> float:
         empty = self.config.empty_soc_pct
@@ -546,8 +574,24 @@ class Battery:
         if soc is None:
             return
         from_soc = self._from_soc(soc)
+        # A divergence leaves the cycles in progress complete: they count the flows, which were seen (a missed one
+        # already marked them), not the estimate; and a wrong configuration, which learning corrects, diverges too
         if state.energy_kwh is None or abs(state.energy_kwh - from_soc) > DIVERGENCE_KWH:
             self._restart(at, FROM_SOC, from_soc)
+
+
+def _finite(reading: Reading) -> Reading:
+    """The reading with its non-finite values (nan, inf: a broken sensor) unavailable: one would poison the estimate,
+    and no divergence check catches a nan."""
+    broken = [name for name in _READING_FIELDS if not _known_or_finite(getattr(reading, name))]
+    return replace(reading, **dict.fromkeys(broken)) if broken else reading
+
+
+_READING_FIELDS = ("soc_pct", "power_w", "charged_kwh", "discharged_kwh", "cell_high_v")
+
+
+def _known_or_finite(value: float | None) -> bool:
+    return value is None or math.isfinite(value)
 
 
 def _hours(since: datetime | None, at: datetime) -> float:
