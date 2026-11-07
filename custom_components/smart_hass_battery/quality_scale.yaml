@@ -64,9 +64,7 @@ rules:
     status: exempt
     comment: Nothing to discover; the user chooses the source entities.
   docs-data-update: done
-  docs-examples:
-    status: todo
-    comment: Automation examples to add before the first release.
+  docs-examples: done
   docs-known-limitations: done
   docs-supported-devices: done
   docs-supported-functions: done
