@@ -6,7 +6,9 @@
 model/  ←  tracker.py  ←  sensor.py, binary_sensor.py, __init__.py (setup, services), config_flow.py
 ```
 
-- **`model/`** (pure Python, rule 1): the battery model, see [model.md](model.md).
+- **`model/`** (pure Python, rule 1): `battery.py` (`BatteryConfig`, `Reading`, `BatteryState`, `Battery`: the
+  counting, the landmarks, the learning, see [model.md](model.md); `state_to_dict` / `state_from_dict` for
+  persistence), `meter.py` (`meter_delta`, rule 12).
 - **`tracker.py`** and the platforms (rule 2): not written yet. The tracker will read the configured entities into
   the model's readings (`unavailable` / `unknown` → None, units converted), update the model on every state change
   (time = the event's `time_fired`) and on a timer, persist its state (`Store`) and notify the entities; the
