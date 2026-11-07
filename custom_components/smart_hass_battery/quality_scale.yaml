@@ -1,0 +1,101 @@
+# Self-assessment against Home Assistant's Integration Quality Scale (https://developers.home-assistant.io/docs/core/integration-quality-scale/).
+# A custom integration gets no official tier: this file is the checklist, in the format of the core integrations.
+# Target of 0.1: gold.
+rules:
+  # Bronze
+  action-setup: done
+  appropriate-polling:
+    status: exempt
+    comment: No polling; the tracker follows the source entities' state changes and refreshes every minute.
+  brands:
+    status: todo
+    comment: Icon and logo to add in brand/ before the first release.
+  common-modules: done
+  config-flow-test-coverage: done
+  config-flow: done
+  dependency-transparency:
+    status: exempt
+    comment: No requirement.
+  docs-actions: done
+  docs-conditions:
+    status: exempt
+    comment: No condition.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: No trigger.
+  entity-event-setup: done
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure:
+    status: exempt
+    comment: No device or service to connect to; the source entities are chosen with selectors.
+  test-before-setup:
+    status: exempt
+    comment: No device or service to connect to; missing source entities read as unavailable.
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions: done
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable:
+    status: done
+    comment: The estimate's entities become unavailable after 15 min without the flows (the power, or the meters); the learned values and the last landmark stay known facts.
+  integration-owner: done
+  log-when-unavailable: done
+  parallel-updates: done
+  reauthentication-flow:
+    status: exempt
+    comment: No authentication.
+  test-coverage: done
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery-update-info:
+    status: exempt
+    comment: Nothing to discover.
+  discovery:
+    status: exempt
+    comment: Nothing to discover; the user chooses the source entities.
+  docs-data-update: done
+  docs-examples:
+    status: todo
+    comment: Automation examples to add before the first release.
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: One device per config entry.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default:
+    status: exempt
+    comment: The diagnostic entities are few and cheap (no polling); the main ones drive the battery.
+  entity-translations: done
+  exception-translations: done
+  icon-translations: done
+  reconfiguration-flow: done
+  repair-issues:
+    status: done
+    comment: A source entity that no longer exists for 15 min; the issue tells to reconfigure.
+  stale-devices:
+    status: exempt
+    comment: One device per config entry, removed with it.
+
+  # Platinum
+  async-dependency:
+    status: exempt
+    comment: No dependency.
+  inject-websession:
+    status: exempt
+    comment: No HTTP request.
+  strict-typing: done

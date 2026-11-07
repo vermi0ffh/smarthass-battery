@@ -1,0 +1,268 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Batterie",
+        "description": "Les entités que Home Assistant a déjà pour la batterie, et la batterie. L'intégration ne fait que les lire : elle ne pilote jamais l'onduleur ni la batterie.",
+        "data": {
+          "name": "Nom",
+          "soc_entity": "État de charge",
+          "power_entity": "Puissance batterie",
+          "invert_power": "Puissance positive en décharge",
+          "charged_entity": "Énergie entrée",
+          "discharged_entity": "Énergie sortie",
+          "cell_voltage_entities": "Tensions des cellules",
+          "nominal_capacity_kwh": "Capacité nominale",
+          "empty_soc_pct": "Seuil vide",
+          "full_cell_v": "Tension de cellule pleine",
+          "efficiency_pct": "Rendement aller-retour",
+          "full_energy_kwh": "Énergie entre les repères",
+          "max_power_kw": "Puissance maximale",
+          "learn": "Utiliser les valeurs apprises"
+        },
+        "data_description": {
+          "soc_entity": "L'état de charge donné par le BMS de la batterie (%). Son passage sous le seuil vide est le repère vide.",
+          "power_entity": "Facultatif : la puissance DC de la batterie (W ou kW), positive en charge. Avec elle, les flux sont intégrés depuis la puissance ; elle ou les deux compteurs d'énergie sont nécessaires.",
+          "invert_power": "À activer si l'onduleur donne la puissance de la batterie positive en décharge.",
+          "charged_entity": "Facultatif : un compteur cumulé de l'énergie entrée dans la batterie (DC ; un compteur journalier convient). Avec une puissance, il compte ce qu'elle a manqué pendant ses indisponibilités.",
+          "discharged_entity": "Facultatif : un compteur cumulé de l'énergie sortie de la batterie (DC), avec l'énergie entrée.",
+          "cell_voltage_entities": "Facultatif : la tension de cellule la plus haute de chaque pack (V ou mV). Une cellule à la tension pleine est le repère plein ; sans elles, l'état de charge à 100 %.",
+          "nominal_capacity_kwh": "La capacité de la batterie sur sa fiche technique.",
+          "empty_soc_pct": "L'état de charge où la batterie est considérée vide, en général là où une automatisation bascule la maison sur le réseau.",
+          "full_cell_v": "Une cellule à cette tension est le repère plein (3,50 V en LFP), quand les tensions des cellules sont données.",
+          "efficiency_pct": "Ce qui sort de la batterie pour ce qui est entré (DC), tant qu'aucun n'est appris.",
+          "full_energy_kwh": "Facultatif : l'énergie que la batterie rend de plein jusqu'au seuil vide. Sans elle, la capacité nominale au-dessus du seuil vide.",
+          "max_power_kw": "Une hausse de compteur plus rapide que cela est une valeur aberrante.",
+          "learn": "Compter le rendement et l'énergie entre les repères appris sur les cycles à la place des valeurs ci-dessus, dès 3 cycles. Appris dans tous les cas (les capteurs de diagnostic)."
+        }
+      },
+      "reconfigure": {
+        "title": "Entités de la batterie",
+        "description": "Les entités lues. Les paramètres de la batterie et l'estimation restent ; des compteurs remplacés sont comptés depuis leur première lecture.",
+        "data": {
+          "soc_entity": "État de charge",
+          "power_entity": "Puissance batterie",
+          "invert_power": "Puissance positive en décharge",
+          "charged_entity": "Énergie entrée",
+          "discharged_entity": "Énergie sortie",
+          "cell_voltage_entities": "Tensions des cellules"
+        },
+        "data_description": {
+          "soc_entity": "L'état de charge donné par le BMS de la batterie (%). Son passage sous le seuil vide est le repère vide.",
+          "power_entity": "Facultatif : la puissance DC de la batterie (W ou kW), positive en charge. Avec elle, les flux sont intégrés depuis la puissance ; elle ou les deux compteurs d'énergie sont nécessaires.",
+          "invert_power": "À activer si l'onduleur donne la puissance de la batterie positive en décharge.",
+          "charged_entity": "Facultatif : un compteur cumulé de l'énergie entrée dans la batterie (DC ; un compteur journalier convient). Avec une puissance, il compte ce qu'elle a manqué pendant ses indisponibilités.",
+          "discharged_entity": "Facultatif : un compteur cumulé de l'énergie sortie de la batterie (DC), avec l'énergie entrée.",
+          "cell_voltage_entities": "Facultatif : la tension de cellule la plus haute de chaque pack (V ou mV). Une cellule à la tension pleine est le repère plein ; sans elles, l'état de charge à 100 %."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Cet état de charge a déjà une batterie.",
+      "reconfigure_successful": "La batterie lit maintenant les nouvelles entités."
+    },
+    "error": {
+      "no_flow_source": "Donnez la puissance de la batterie ou les deux compteurs d'énergie : l'intégration compte l'énergie qui entre et qui sort.",
+      "one_meter": "Donnez les deux compteurs d'énergie (entrée et sortie), ou aucun.",
+      "full_energy_above_capacity": "L'énergie entre les repères ne peut pas dépasser la capacité nominale."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Batterie",
+        "description": "La batterie. Pour changer les entités lues, reconfigurez la batterie.",
+        "data": {
+          "nominal_capacity_kwh": "Capacité nominale",
+          "empty_soc_pct": "Seuil vide",
+          "full_cell_v": "Tension de cellule pleine",
+          "efficiency_pct": "Rendement aller-retour",
+          "full_energy_kwh": "Énergie entre les repères",
+          "max_power_kw": "Puissance maximale",
+          "learn": "Utiliser les valeurs apprises"
+        },
+        "data_description": {
+          "nominal_capacity_kwh": "La capacité de la batterie sur sa fiche technique.",
+          "empty_soc_pct": "L'état de charge où la batterie est considérée vide, en général là où une automatisation bascule la maison sur le réseau.",
+          "full_cell_v": "Une cellule à cette tension est le repère plein (3,50 V en LFP), quand les tensions des cellules sont données.",
+          "efficiency_pct": "Ce qui sort de la batterie pour ce qui est entré (DC), tant qu'aucun n'est appris.",
+          "full_energy_kwh": "Facultatif : l'énergie que la batterie rend de plein jusqu'au seuil vide. Sans elle, la capacité nominale au-dessus du seuil vide.",
+          "max_power_kw": "Une hausse de compteur plus rapide que cela est une valeur aberrante.",
+          "learn": "Compter le rendement et l'énergie entre les repères appris sur les cycles à la place des valeurs ci-dessus, dès 3 cycles. Appris dans tous les cas (les capteurs de diagnostic)."
+        }
+      }
+    },
+    "error": {
+      "full_energy_above_capacity": "L'énergie entre les repères ne peut pas dépasser la capacité nominale."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "energy": {
+        "name": "Énergie stockée",
+        "state_attributes": {
+          "nominal_capacity_kwh": {
+            "name": "Capacité nominale"
+          },
+          "full_energy_kwh": {
+            "name": "Énergie entre les repères"
+          },
+          "efficiency": {
+            "name": "Rendement aller-retour"
+          },
+          "empty_soc_pct": {
+            "name": "Seuil vide"
+          },
+          "room_kwh": {
+            "name": "Place restante"
+          },
+          "uncertainty_kwh": {
+            "name": "Incertitude"
+          },
+          "soc_pct": {
+            "name": "État de charge"
+          },
+          "last_landmark": {
+            "name": "Dernier repère"
+          },
+          "last_landmark_at": {
+            "name": "Heure du dernier repère"
+          },
+          "soc_entity": {
+            "name": "État de charge"
+          },
+          "power_entity": {
+            "name": "Puissance batterie"
+          },
+          "charged_entity": {
+            "name": "Énergie entrée"
+          },
+          "discharged_entity": {
+            "name": "Énergie sortie"
+          }
+        }
+      },
+      "soc": {
+        "name": "État de charge"
+      },
+      "room": {
+        "name": "Place restante"
+      },
+      "uncertainty": {
+        "name": "Incertitude"
+      },
+      "learned_efficiency": {
+        "name": "Rendement appris",
+        "state_attributes": {
+          "configured_efficiency": {
+            "name": "Rendement configuré"
+          },
+          "efficiency_in_use": {
+            "name": "Rendement utilisé"
+          },
+          "learning_enabled": {
+            "name": "Apprentissage activé"
+          },
+          "cycles": {
+            "name": "Cycles mesurés"
+          }
+        }
+      },
+      "learned_full_energy": {
+        "name": "Énergie entre les repères apprise",
+        "state_attributes": {
+          "configured_full_energy_kwh": {
+            "name": "Énergie configurée"
+          },
+          "full_energy_in_use_kwh": {
+            "name": "Énergie utilisée"
+          },
+          "learning_enabled": {
+            "name": "Apprentissage activé"
+          },
+          "cycles": {
+            "name": "Cycles mesurés"
+          }
+        }
+      },
+      "last_landmark": {
+        "name": "Dernier repère",
+        "state_attributes": {
+          "kind": {
+            "name": "Type",
+            "state": {
+              "full": "Plein",
+              "empty": "Vide"
+            }
+          },
+          "error_kwh": {
+            "name": "Écart du comptage"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "unknown_entry": {
+      "message": "Aucune batterie avec l'entrée de configuration {entry}."
+    }
+  },
+  "services": {
+    "mark_full": {
+      "name": "Marquer pleine",
+      "description": "La batterie est pleine maintenant : le comptage repart de là (rien n'en est appris).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Batterie",
+          "description": "La batterie concernée."
+        }
+      }
+    },
+    "mark_empty": {
+      "name": "Marquer vide",
+      "description": "La batterie est à son seuil vide maintenant.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Batterie",
+          "description": "La batterie concernée."
+        }
+      }
+    },
+    "set_energy": {
+      "name": "Fixer l'énergie",
+      "description": "Fixe l'énergie que la batterie peut encore rendre au-dessus de son seuil vide.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Batterie",
+          "description": "La batterie concernée."
+        },
+        "energy_kwh": {
+          "name": "Énergie stockée",
+          "description": "kWh au-dessus du seuil vide."
+        }
+      }
+    }
+  },
+  "issues": {
+    "missing_soc_entity": {
+      "title": "L'état de charge de {name} n'existe plus",
+      "description": "L'état de charge {entity} de la batterie {name} n'existe plus (entité renommée, ou son appareil supprimé) : le repère vide n'est plus vu. Pour choisir son remplacement ou la retirer, reconfigurez la batterie : *Paramètres* > *Appareils et services* > *Smart Hass - Battery* > ⋮ > *Reconfigurer*."
+    },
+    "missing_power_entity": {
+      "title": "La puissance batterie de {name} n'existe plus",
+      "description": "La puissance batterie {entity} de la batterie {name} n'existe plus (entité renommée, ou son appareil supprimé) : les flux sont comptés par les compteurs d'énergie s'il y en a, sinon l'énergie stockée est indisponible. Pour choisir son remplacement ou la retirer, reconfigurez la batterie : *Paramètres* > *Appareils et services* > *Smart Hass - Battery* > ⋮ > *Reconfigurer*."
+    },
+    "missing_charged_entity": {
+      "title": "Le compteur d'énergie entrée de {name} n'existe plus",
+      "description": "Le compteur d'énergie entrée {entity} de la batterie {name} n'existe plus (entité renommée, ou son appareil supprimé) : l'énergie entrée n'est plus comptée. Pour choisir son remplacement ou la retirer, reconfigurez la batterie : *Paramètres* > *Appareils et services* > *Smart Hass - Battery* > ⋮ > *Reconfigurer*."
+    },
+    "missing_discharged_entity": {
+      "title": "Le compteur d'énergie sortie de {name} n'existe plus",
+      "description": "Le compteur d'énergie sortie {entity} de la batterie {name} n'existe plus (entité renommée, ou son appareil supprimé) : l'énergie sortie n'est plus comptée. Pour choisir son remplacement ou la retirer, reconfigurez la batterie : *Paramètres* > *Appareils et services* > *Smart Hass - Battery* > ⋮ > *Reconfigurer*."
+    },
+    "missing_cell_voltage_entities": {
+      "title": "La tension de cellule de {name} n'existe plus",
+      "description": "La tension de cellule {entity} de la batterie {name} n'existe plus (entité renommée, ou son appareil supprimé) : le repère plein n'est plus vu. Pour choisir son remplacement ou la retirer, reconfigurez la batterie : *Paramètres* > *Appareils et services* > *Smart Hass - Battery* > ⋮ > *Reconfigurer*."
+    }
+  }
+}

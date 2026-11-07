@@ -12,7 +12,7 @@ planners can rely on.
 
 It only reads and estimates: it never drives the inverter or the battery.
 
-**Status**: in development, not installable yet.
+**Status**: in development, not released yet. Documentation: [English](doc/en/README.md), [français](doc/fr/README.md).
 
 ## License
 

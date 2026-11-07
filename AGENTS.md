@@ -22,7 +22,7 @@ energy planner such as Smart Hass - Energy Optimizer, a charge regulator) only r
 
 | Path | Content |
 |------|---------|
-| `custom_components/smart_hass_battery/` | The integration: `model/` (the battery model, pure Python: `battery.py`, `meter.py`). The Home Assistant glue (tracker, platforms, config flow) comes in a later version |
+| `custom_components/smart_hass_battery/` | The integration: `model/` (the battery model, pure Python: `battery.py`, `meter.py`), `tracker.py` (the Home Assistant glue), `sensor.py`, `config_flow.py`, `diagnostics.py`, `__init__.py` (setup, services), `strings.json` and `translations/` |
 | `tests/` | `tests/model/` (pure model, no Home Assistant; `tests/model/data/` holds recorded histories), `tests/integration/` (with `pytest-homeassistant-custom-component`) |
 | `review/` | AI code review (`make review`): axis prompts, derogations, engines |
 | `doc/` | Documentation: `doc/agents/` (technical, for agents, English), `doc/en/` and `doc/fr/` (for humans) |

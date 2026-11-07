@@ -1,0 +1,13 @@
+{
+  "domain": "smart_hass_battery",
+  "name": "Smart Hass - Battery",
+  "codeowners": ["@vermi0ffh"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/vermi0ffh/smarthass-battery",
+  "integration_type": "device",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/vermi0ffh/smarthass-battery/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}
