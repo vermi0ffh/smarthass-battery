@@ -12,7 +12,8 @@ planners can rely on.
 
 It only reads and estimates: it never drives the inverter or the battery.
 
-**Status**: in development, not released yet. Documentation: [English](doc/en/README.md), [français](doc/fr/README.md).
+Installation with HACS (custom repository `https://github.com/vermi0ffh/smarthass-battery`, category *Integration*).
+Documentation: [English](doc/en/README.md), [français](doc/fr/README.md).
 
 ## License
 

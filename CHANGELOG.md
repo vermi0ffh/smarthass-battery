@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased (0.1.0)
+Versions follow [semantic versioning](https://semver.org/). Before 1.0.0, a minor version may change the options or
+the entities; such a change is described here, with what to do.
+
+## 0.1.0 (2026-11-07)
 
 First version.
 
