@@ -1,0 +1,30 @@
+mark_full:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: smart_hass_battery
+mark_empty:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: smart_hass_battery
+set_energy:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: smart_hass_battery
+    energy_kwh:
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 0.01
+          unit_of_measurement: kWh
+          mode: box

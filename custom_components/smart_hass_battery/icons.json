@@ -1,0 +1,35 @@
+{
+  "entity": {
+    "sensor": {
+      "energy": {
+        "default": "mdi:home-battery"
+      },
+      "room": {
+        "default": "mdi:battery-arrow-up-outline"
+      },
+      "uncertainty": {
+        "default": "mdi:plus-minus-variant"
+      },
+      "learned_efficiency": {
+        "default": "mdi:swap-vertical"
+      },
+      "learned_full_energy": {
+        "default": "mdi:battery-check"
+      },
+      "last_landmark": {
+        "default": "mdi:map-marker-check"
+      }
+    }
+  },
+  "services": {
+    "mark_full": {
+      "service": "mdi:battery"
+    },
+    "mark_empty": {
+      "service": "mdi:battery-outline"
+    },
+    "set_energy": {
+      "service": "mdi:battery-sync"
+    }
+  }
+}

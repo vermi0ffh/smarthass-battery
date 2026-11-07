@@ -1,0 +1,268 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Battery",
+        "description": "The entities Home Assistant already has for the battery, and the battery. The integration only reads them: it never drives the inverter or the battery.",
+        "data": {
+          "name": "Name",
+          "soc_entity": "State of charge",
+          "power_entity": "Battery power",
+          "invert_power": "Power positive while discharging",
+          "charged_entity": "Energy in",
+          "discharged_entity": "Energy out",
+          "cell_voltage_entities": "Cell voltages",
+          "nominal_capacity_kwh": "Nominal capacity",
+          "empty_soc_pct": "Empty threshold",
+          "full_cell_v": "Full cell voltage",
+          "efficiency_pct": "Round trip",
+          "full_energy_kwh": "Energy between the landmarks",
+          "max_power_kw": "Maximum power",
+          "learn": "Use the learned values"
+        },
+        "data_description": {
+          "soc_entity": "The state of charge the battery's BMS reports (%). Its crossing of the empty threshold is the empty landmark.",
+          "power_entity": "Optional: the battery's DC power (W or kW), positive while charging. With it, the flows are integrated from the power; it or both energy meters are needed.",
+          "invert_power": "On when the inverter reports the battery's power positive while discharging.",
+          "charged_entity": "Optional: a cumulative meter of the energy into the battery (DC; a daily meter is fine). With a power, it counts what the power missed while unavailable.",
+          "discharged_entity": "Optional: a cumulative meter of the energy out of the battery (DC), with the energy in.",
+          "cell_voltage_entities": "Optional: the highest cell voltage of each pack (V or mV). A cell at the full voltage is the full landmark; without them, the state of charge reaching 100 %.",
+          "nominal_capacity_kwh": "The battery's capacity on its datasheet.",
+          "empty_soc_pct": "The state of charge where the battery is taken as empty, usually where an automation switches the house to the grid.",
+          "full_cell_v": "A cell at this voltage is the full landmark (3.50 V on LFP), when cell voltages are given.",
+          "efficiency_pct": "What comes out of the battery for what went in (DC), until one is learned.",
+          "full_energy_kwh": "Optional: the energy the battery delivers from full to the empty threshold. Without it, the nominal capacity above the empty threshold.",
+          "max_power_kw": "A meter increase faster than this is a spurious value.",
+          "learn": "Count the round trip and the energy between the landmarks learned on the cycles in place of the values above, from 3 cycles. Learned in any case (the diagnostic sensors)."
+        }
+      },
+      "reconfigure": {
+        "title": "Battery entities",
+        "description": "The entities read. The battery's parameters and the estimate stay; replaced meters are counted from their first reading.",
+        "data": {
+          "soc_entity": "State of charge",
+          "power_entity": "Battery power",
+          "invert_power": "Power positive while discharging",
+          "charged_entity": "Energy in",
+          "discharged_entity": "Energy out",
+          "cell_voltage_entities": "Cell voltages"
+        },
+        "data_description": {
+          "soc_entity": "The state of charge the battery's BMS reports (%). Its crossing of the empty threshold is the empty landmark.",
+          "power_entity": "Optional: the battery's DC power (W or kW), positive while charging. With it, the flows are integrated from the power; it or both energy meters are needed.",
+          "invert_power": "On when the inverter reports the battery's power positive while discharging.",
+          "charged_entity": "Optional: a cumulative meter of the energy into the battery (DC; a daily meter is fine). With a power, it counts what the power missed while unavailable.",
+          "discharged_entity": "Optional: a cumulative meter of the energy out of the battery (DC), with the energy in.",
+          "cell_voltage_entities": "Optional: the highest cell voltage of each pack (V or mV). A cell at the full voltage is the full landmark; without them, the state of charge reaching 100 %."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This state of charge already has a battery.",
+      "reconfigure_successful": "The battery now reads the new entities."
+    },
+    "error": {
+      "no_flow_source": "Give the battery power or both energy meters: the integration counts the energy that flows in and out.",
+      "one_meter": "Give both energy meters (in and out), or none.",
+      "full_energy_above_capacity": "The energy between the landmarks cannot exceed the nominal capacity."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Battery",
+        "description": "The battery. To change the entities read, reconfigure the battery.",
+        "data": {
+          "nominal_capacity_kwh": "Nominal capacity",
+          "empty_soc_pct": "Empty threshold",
+          "full_cell_v": "Full cell voltage",
+          "efficiency_pct": "Round trip",
+          "full_energy_kwh": "Energy between the landmarks",
+          "max_power_kw": "Maximum power",
+          "learn": "Use the learned values"
+        },
+        "data_description": {
+          "nominal_capacity_kwh": "The battery's capacity on its datasheet.",
+          "empty_soc_pct": "The state of charge where the battery is taken as empty, usually where an automation switches the house to the grid.",
+          "full_cell_v": "A cell at this voltage is the full landmark (3.50 V on LFP), when cell voltages are given.",
+          "efficiency_pct": "What comes out of the battery for what went in (DC), until one is learned.",
+          "full_energy_kwh": "Optional: the energy the battery delivers from full to the empty threshold. Without it, the nominal capacity above the empty threshold.",
+          "max_power_kw": "A meter increase faster than this is a spurious value.",
+          "learn": "Count the round trip and the energy between the landmarks learned on the cycles in place of the values above, from 3 cycles. Learned in any case (the diagnostic sensors)."
+        }
+      }
+    },
+    "error": {
+      "full_energy_above_capacity": "The energy between the landmarks cannot exceed the nominal capacity."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "energy": {
+        "name": "Stored energy",
+        "state_attributes": {
+          "nominal_capacity_kwh": {
+            "name": "Nominal capacity"
+          },
+          "full_energy_kwh": {
+            "name": "Energy between the landmarks"
+          },
+          "efficiency": {
+            "name": "Round trip"
+          },
+          "empty_soc_pct": {
+            "name": "Empty threshold"
+          },
+          "room_kwh": {
+            "name": "Room to full"
+          },
+          "uncertainty_kwh": {
+            "name": "Uncertainty"
+          },
+          "soc_pct": {
+            "name": "State of charge"
+          },
+          "last_landmark": {
+            "name": "Last landmark"
+          },
+          "last_landmark_at": {
+            "name": "Last landmark time"
+          },
+          "soc_entity": {
+            "name": "State of charge"
+          },
+          "power_entity": {
+            "name": "Battery power"
+          },
+          "charged_entity": {
+            "name": "Energy in"
+          },
+          "discharged_entity": {
+            "name": "Energy out"
+          }
+        }
+      },
+      "soc": {
+        "name": "State of charge"
+      },
+      "room": {
+        "name": "Room to full"
+      },
+      "uncertainty": {
+        "name": "Uncertainty"
+      },
+      "learned_efficiency": {
+        "name": "Learned round trip",
+        "state_attributes": {
+          "configured_efficiency": {
+            "name": "Configured round trip"
+          },
+          "efficiency_in_use": {
+            "name": "Round trip in use"
+          },
+          "learning_enabled": {
+            "name": "Learning enabled"
+          },
+          "cycles": {
+            "name": "Cycles measured"
+          }
+        }
+      },
+      "learned_full_energy": {
+        "name": "Learned energy between the landmarks",
+        "state_attributes": {
+          "configured_full_energy_kwh": {
+            "name": "Configured energy"
+          },
+          "full_energy_in_use_kwh": {
+            "name": "Energy in use"
+          },
+          "learning_enabled": {
+            "name": "Learning enabled"
+          },
+          "cycles": {
+            "name": "Cycles measured"
+          }
+        }
+      },
+      "last_landmark": {
+        "name": "Last landmark",
+        "state_attributes": {
+          "kind": {
+            "name": "Kind",
+            "state": {
+              "full": "Full",
+              "empty": "Empty"
+            }
+          },
+          "error_kwh": {
+            "name": "Counting error"
+          }
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "unknown_entry": {
+      "message": "No battery with the configuration entry {entry}."
+    }
+  },
+  "services": {
+    "mark_full": {
+      "name": "Mark full",
+      "description": "The battery is full now: the counting restarts from there (nothing is learned from it).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Battery",
+          "description": "The battery concerned."
+        }
+      }
+    },
+    "mark_empty": {
+      "name": "Mark empty",
+      "description": "The battery is at its empty threshold now.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Battery",
+          "description": "The battery concerned."
+        }
+      }
+    },
+    "set_energy": {
+      "name": "Set energy",
+      "description": "Sets the energy the battery can still deliver above its empty threshold.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Battery",
+          "description": "The battery concerned."
+        },
+        "energy_kwh": {
+          "name": "Stored energy",
+          "description": "kWh above the empty threshold."
+        }
+      }
+    }
+  },
+  "issues": {
+    "missing_soc_entity": {
+      "title": "The state of charge of {name} no longer exists",
+      "description": "The state of charge {entity} of the battery {name} no longer exists (renamed, or its device removed): the empty landmark is no longer seen. To choose its replacement or remove it, reconfigure the battery: *Settings* > *Devices & services* > *Smart Hass - Battery* > ⋮ > *Reconfigure*."
+    },
+    "missing_power_entity": {
+      "title": "The battery power of {name} no longer exists",
+      "description": "The battery power {entity} of the battery {name} no longer exists (renamed, or its device removed): the flows are counted by the energy meters if any, else the stored energy is unavailable. To choose its replacement or remove it, reconfigure the battery: *Settings* > *Devices & services* > *Smart Hass - Battery* > ⋮ > *Reconfigure*."
+    },
+    "missing_charged_entity": {
+      "title": "The energy in meter of {name} no longer exists",
+      "description": "The energy in meter {entity} of the battery {name} no longer exists (renamed, or its device removed): the energy in is no longer counted. To choose its replacement or remove it, reconfigure the battery: *Settings* > *Devices & services* > *Smart Hass - Battery* > ⋮ > *Reconfigure*."
+    },
+    "missing_discharged_entity": {
+      "title": "The energy out meter of {name} no longer exists",
+      "description": "The energy out meter {entity} of the battery {name} no longer exists (renamed, or its device removed): the energy out is no longer counted. To choose its replacement or remove it, reconfigure the battery: *Settings* > *Devices & services* > *Smart Hass - Battery* > ⋮ > *Reconfigure*."
+    },
+    "missing_cell_voltage_entities": {
+      "title": "The cell voltage of {name} no longer exists",
+      "description": "The cell voltage {entity} of the battery {name} no longer exists (renamed, or its device removed): the full landmark is no longer seen. To choose its replacement or remove it, reconfigure the battery: *Settings* > *Devices & services* > *Smart Hass - Battery* > ⋮ > *Reconfigure*."
+    }
+  }
+}
