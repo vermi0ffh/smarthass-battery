@@ -8,9 +8,14 @@ CONF_POWER_ENTITY = "power_entity"
 CONF_CHARGED_ENTITY = "charged_entity"
 CONF_DISCHARGED_ENTITY = "discharged_entity"
 CONF_CELL_VOLTAGE_ENTITIES = "cell_voltage_entities"
-SOURCE_KEYS = (CONF_SOC_ENTITY, CONF_POWER_ENTITY, CONF_CHARGED_ENTITY, CONF_DISCHARGED_ENTITY)
 # The power is read positive while charging; on: the inverter reports it the other way (positive while discharging)
 CONF_INVERT_POWER = "invert_power"
+# The sources of one entity each (a planner reads them, the stored state records them); the energy meters (both or
+# none); every source followed (with the cells); what reconfiguring changes (the rest is the battery, the options)
+ENTITY_KEYS = (CONF_SOC_ENTITY, CONF_POWER_ENTITY, CONF_CHARGED_ENTITY, CONF_DISCHARGED_ENTITY)
+METER_KEYS = (CONF_CHARGED_ENTITY, CONF_DISCHARGED_ENTITY)
+FOLLOWED_KEYS = (*ENTITY_KEYS, CONF_CELL_VOLTAGE_ENTITIES)
+RECONFIGURE_KEYS = (*FOLLOWED_KEYS, CONF_INVERT_POWER)
 
 # The battery
 CONF_NOMINAL_CAPACITY_KWH = "nominal_capacity_kwh"

@@ -5,16 +5,13 @@ import logging
 import math
 from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, NamedTuple
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, UnitOfElectricPotential, UnitOfEnergy, UnitOfPower
 from homeassistant.core import CALLBACK_TYPE, Event, EventStateChangedData, HomeAssistant, State, callback
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.helpers.event import (
-    async_track_state_change_event,
-    async_track_time_interval,
-)
+from homeassistant.helpers.event import async_track_state_change_event, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
@@ -37,10 +34,11 @@ from .const import (
     DEFAULT_FULL_CELL_V,
     DEFAULT_MAX_POWER_KW,
     DOMAIN,
-    SOURCE_KEYS,
+    ENTITY_KEYS,
+    FOLLOWED_KEYS,
+    METER_KEYS,
 )
 from .model import Battery, BatteryConfig, Reading, state_from_dict, state_to_dict
-from .model.battery import STATE_VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,6 +50,9 @@ REFRESH_INTERVAL = timedelta(minutes=1)
 UNAVAILABLE_AFTER = timedelta(minutes=15)
 # A burst of readings (power every few seconds) is saved once
 SAVE_DELAY_S = 30
+# The Store's own format: the model's state inside it has its version ("version", read by state_from_dict), so a
+# change of the model's format never makes Home Assistant refuse the stored file
+STORAGE_VERSION = 1
 
 _POWER_TO_W: dict[str, float] = {UnitOfPower.WATT: 1.0, UnitOfPower.KILO_WATT: 1000.0}
 _ENERGY_TO_KWH: dict[str, float] = {
@@ -83,12 +84,18 @@ _CONSEQUENCES = {
     CONF_DISCHARGED_ENTITY: "the flows it counts are counted when it comes back",
     CONF_CELL_VOLTAGE_ENTITIES: "the full landmark is not seen until they come back",
 }
-FOLLOWED_KEYS = (*SOURCE_KEYS, CONF_CELL_VOLTAGE_ENTITIES)
 
 
-def store_key(entry_id: str) -> str:
+class Measure(NamedTuple):
+    """A source's value in the model's unit, or None and why."""
+
+    value: float | None
+    cause: str | None = None
+
+
+def stored_state(hass: HomeAssistant, entry_id: str) -> Store[dict[str, Any]]:
     """Where a battery's estimate is stored (.storage/)."""
-    return f"{DOMAIN}.{entry_id}"
+    return Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry_id}")
 
 
 def battery_config(options: dict[str, Any]) -> BatteryConfig:
@@ -103,14 +110,10 @@ def battery_config(options: dict[str, Any]) -> BatteryConfig:
         efficiency=float(options.get(CONF_EFFICIENCY_PCT, DEFAULT_EFFICIENCY_PCT)) / 100.0,
         full_energy_kwh=None if full_energy is None else float(full_energy),
         has_power=bool(options.get(CONF_POWER_ENTITY)),
-        has_meters=has_meters(options),
+        has_meters=all(options.get(key) for key in METER_KEYS),
         learn=bool(options.get(CONF_LEARN, False)),
         max_power_kw=float(options.get(CONF_MAX_POWER_KW, DEFAULT_MAX_POWER_KW)),
     )
-
-
-def has_meters(options: dict[str, Any]) -> bool:
-    return bool(options.get(CONF_CHARGED_ENTITY)) and bool(options.get(CONF_DISCHARGED_ENTITY))
 
 
 class BatteryTracker:
@@ -118,26 +121,24 @@ class BatteryTracker:
         self.hass = hass
         self.entry = entry
         self._options = dict(entry.options)
-        self._store: Store[dict[str, Any]] = Store(hass, STATE_VERSION, store_key(entry.entry_id))
+        self._store = stored_state(hass, entry.entry_id)
         self.battery = Battery(battery_config(self._options))
         self._listeners: list[Callable[[], None]] = []
         self._unsubscribe: list[CALLBACK_TYPE] = []
         # Each source unavailable since when (first seen so), and those already logged as unavailable
         self._unavailable_since: dict[str, datetime] = {}
-        self._reported: set[str] = set()
+        self._reported_unavailable: set[str] = set()
 
     # --- Lifecycle ---
 
     async def async_start(self) -> None:
         stored = await self._store.async_load()
-        if stored is not None:
+        if isinstance(stored, dict):
             self.battery = Battery(battery_config(self._options), state_from_dict(stored))
             self.battery.resume()
             # Meters replaced (reconfigured): their values are no increase of the previous ones
             previous = stored.get("sources")
-            if isinstance(previous, dict) and any(
-                previous.get(key) != self._options.get(key) for key in (CONF_CHARGED_ENTITY, CONF_DISCHARGED_ENTITY)
-            ):
+            if isinstance(previous, dict) and any(previous.get(key) != self._options.get(key) for key in METER_KEYS):
                 self.battery.forget_meters()
         self._update(dt_util.utcnow())
         self._unsubscribe.append(async_track_state_change_event(self.hass, self._entities(), self._on_state_change))
@@ -147,6 +148,9 @@ class BatteryTracker:
         for unsubscribe in self._unsubscribe:
             unsubscribe()
         self._unsubscribe.clear()
+        # What flowed since the last update is counted before saving: after the restart, the power is not held over
+        # the downtime
+        self.battery.update(dt_util.utcnow(), self._reading())
         for key in FOLLOWED_KEYS:  # raised again after 15 min if still true (e.g. after reconfiguring)
             ir.async_delete_issue(self.hass, DOMAIN, self._issue_id(key))
         await self._store.async_save(self._stored())
@@ -155,13 +159,12 @@ class BatteryTracker:
 
     @property
     def estimate_available(self) -> bool:
-        """False while the flows' sources have been unavailable for UNAVAILABLE_AFTER: the power, unless both meters
-        count what it misses; the meters, without a power."""
-        reported = self._reported
-        meters_out = CONF_CHARGED_ENTITY in reported or CONF_DISCHARGED_ENTITY in reported
-        if self.battery.config.has_power:
-            return CONF_POWER_ENTITY not in reported or (self.battery.config.has_meters and not meters_out)
-        return not meters_out
+        """False while the flows are unknown: the power unavailable for UNAVAILABLE_AFTER, unless both meters count
+        what it misses."""
+        cfg, out = self.battery.config, self._reported_unavailable
+        power_reads = cfg.has_power and CONF_POWER_ENTITY not in out
+        meters_read = cfg.has_meters and not out.intersection(METER_KEYS)
+        return power_reads or meters_read
 
     @callback
     def add_listener(self, listener: Callable[[], None]) -> CALLBACK_TYPE:
@@ -169,22 +172,13 @@ class BatteryTracker:
         return lambda: self._listeners.remove(listener)
 
     def mark_full(self) -> None:
-        now = dt_util.utcnow()
-        self.battery.update(now, self._reading())  # the interval up to now is counted before the restart
-        self.battery.mark_full(now)
-        self._changed()
+        self._act(lambda now: self.battery.mark_full(now))
 
     def mark_empty(self) -> None:
-        now = dt_util.utcnow()
-        self.battery.update(now, self._reading())
-        self.battery.mark_empty(now)
-        self._changed()
+        self._act(lambda now: self.battery.mark_empty(now))
 
-    def set_energy_kwh(self, energy_kwh: float) -> None:
-        now = dt_util.utcnow()
-        self.battery.update(now, self._reading())
-        self.battery.set_energy(now, energy_kwh)
-        self._changed()
+    def set_energy(self, energy_kwh: float) -> None:
+        self._act(lambda now: self.battery.set_energy(now, energy_kwh))
 
     def planner_attributes(self) -> dict[str, Any]:
         """The battery and its estimate for a planner reading one entity: what it would otherwise configure again
@@ -200,7 +194,7 @@ class BatteryTracker:
             "soc_pct": _round(battery.soc_pct, 1),
             "last_landmark": battery.last_landmark,
             "last_landmark_at": _iso(battery.last_landmark_at),
-            **{key: self._options.get(key) for key in SOURCE_KEYS},
+            **{key: self._options.get(key) for key in ENTITY_KEYS},
         }
 
     def efficiency_attributes(self) -> dict[str, Any]:
@@ -229,11 +223,11 @@ class BatteryTracker:
     def source_states(self) -> dict[str, Any]:
         """What each configured source entity shows now, as Home Assistant has it (diagnostics); None = missing."""
         sources: dict[str, Any] = {}
-        for key in SOURCE_KEYS:
+        for key in ENTITY_KEYS:
             entity_id = self._options.get(key)
             if entity_id:
                 sources[key] = self._source_state(entity_id)
-        cells = self._options.get(CONF_CELL_VOLTAGE_ENTITIES) or []
+        cells = self._entity_ids(CONF_CELL_VOLTAGE_ENTITIES)
         if cells:
             sources[CONF_CELL_VOLTAGE_ENTITIES] = [self._source_state(entity_id) for entity_id in cells]
         return sources
@@ -249,6 +243,13 @@ class BatteryTracker:
             "last_changed": state.last_changed.isoformat(),
         }
 
+    def _act(self, action: Callable[[datetime], None]) -> None:
+        """A service: the interval up to now is counted first, then the action."""
+        now = dt_util.utcnow()
+        self.battery.update(now, self._reading())
+        action(now)
+        self._changed()
+
     # --- Events ---
 
     @callback
@@ -261,59 +262,62 @@ class BatteryTracker:
 
     def _update(self, at: datetime) -> None:
         self.battery.update(at, self._reading())
-        self._follow_sources(at)
+        for key in FOLLOWED_KEYS:
+            if self._entity_ids(key):
+                self._follow_source(key, at)
         self._changed()
 
-    def _follow_sources(self, at: datetime) -> None:
+    def _follow_source(self, key: str, at: datetime) -> None:
         """Logs a source unavailable for UNAVAILABLE_AFTER with the cause, once, and once when it is back."""
-        for key in FOLLOWED_KEYS:
-            entity_ids = self._entity_ids(key)
-            if not entity_ids:
-                continue
-            cause = self._unavailable_cause(key)
-            if cause is None:
-                self._unavailable_since.pop(key, None)
-                if key in self._reported:
-                    self._reported.discard(key)
-                    ir.async_delete_issue(self.hass, DOMAIN, self._issue_id(key))
-                    _LOGGER.info(
-                        "%s: the %s %s available again", self.entry.title, _SOURCE_LABELS[key], _names(entity_ids)
-                    )
-                continue
-            since = self._unavailable_since.setdefault(key, at)
-            if key not in self._reported and at - since >= UNAVAILABLE_AFTER:
-                self._reported.add(key)
-                _LOGGER.info(
-                    "%s: the %s %s unavailable since %s (%s): %s",
-                    self.entry.title,
-                    _SOURCE_LABELS[key],
-                    _names(entity_ids),
-                    dt_util.as_local(since).isoformat(timespec="seconds"),
-                    cause,
-                    _CONSEQUENCES[key],
-                )
-                missing = [entity_id for entity_id in entity_ids if self.hass.states.get(entity_id) is None]
-                if missing:
-                    self._raise_missing(key, missing)
+        cause = self._unavailable_cause(key)
+        if cause is None:
+            self._unavailable_since.pop(key, None)
+            if key in self._reported_unavailable:
+                self._source_back(key)
+            return
+        since = self._unavailable_since.setdefault(key, at)
+        if key not in self._reported_unavailable and at - since >= UNAVAILABLE_AFTER:
+            self._report_unavailable(key, since, cause)
 
-    def _raise_missing(self, key: str, missing: list[str]) -> None:
-        """An entity that no longer exists (renamed, its device removed) will not come back by itself: a repair."""
-        ir.async_create_issue(
-            self.hass,
-            DOMAIN,
-            self._issue_id(key),
-            is_fixable=False,
-            severity=ir.IssueSeverity.ERROR if self._is_flow_source(key) else ir.IssueSeverity.WARNING,
-            translation_key=f"missing_{key}",
-            translation_placeholders={"name": self.entry.title, "entity": ", ".join(missing)},
+    def _source_back(self, key: str) -> None:
+        self._reported_unavailable.discard(key)
+        ir.async_delete_issue(self.hass, DOMAIN, self._issue_id(key))
+        _LOGGER.info(
+            "%s: the %s %s available again", self.entry.title, _SOURCE_LABELS[key], _names(self._entity_ids(key))
         )
 
-    def _is_flow_source(self, key: str) -> bool:
-        """A source without which a flow goes unseen."""
+    def _report_unavailable(self, key: str, since: datetime, cause: str) -> None:
+        """Logged with its cause; an entity that no longer exists (renamed, its device removed) will not come back by
+        itself: a repair issue."""
+        self._reported_unavailable.add(key)
+        entity_ids = self._entity_ids(key)
+        _LOGGER.info(
+            "%s: the %s %s unavailable since %s (%s): %s",
+            self.entry.title,
+            _SOURCE_LABELS[key],
+            _names(entity_ids),
+            dt_util.as_local(since).isoformat(timespec="seconds"),
+            cause,
+            _CONSEQUENCES[key],
+        )
+        missing = [entity_id for entity_id in entity_ids if self.hass.states.get(entity_id) is None]
+        if missing:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                self._issue_id(key),
+                is_fixable=False,
+                severity=ir.IssueSeverity.ERROR if self._flows_depend_on(key) else ir.IssueSeverity.WARNING,
+                translation_key=f"missing_{key}",
+                translation_placeholders={"name": self.entry.title, "entity": ", ".join(missing)},
+            )
+
+    def _flows_depend_on(self, key: str) -> bool:
+        """Without this source alone, the flows are unknown (see estimate_available)."""
         cfg = self.battery.config
         if key == CONF_POWER_ENTITY:
             return not cfg.has_meters
-        return key in (CONF_CHARGED_ENTITY, CONF_DISCHARGED_ENTITY) and not cfg.has_power
+        return key in METER_KEYS and not cfg.has_power
 
     def _issue_id(self, key: str) -> str:
         return f"missing_{key}_{self.entry.entry_id}"
@@ -325,7 +329,7 @@ class BatteryTracker:
 
     def _stored(self) -> dict[str, Any]:
         """The model's state, and the source entities it was measured with (replaced meters are forgotten)."""
-        return {**state_to_dict(self.battery.state), "sources": {key: self._options.get(key) for key in SOURCE_KEYS}}
+        return {**state_to_dict(self.battery.state), "sources": {key: self._options.get(key) for key in ENTITY_KEYS}}
 
     # --- Reading the entities (their Home Assistant semantics stay here, rule 2) ---
 
@@ -339,35 +343,35 @@ class BatteryTracker:
         return [entity_id for key in FOLLOWED_KEYS for entity_id in self._entity_ids(key)]
 
     def _reading(self) -> Reading:
-        power = self._number(CONF_POWER_ENTITY)
+        power = self._value(CONF_POWER_ENTITY)
         if power is not None and self._options.get(CONF_INVERT_POWER):
             power = -power
         cells = [
             value
             for entity_id in self._entity_ids(CONF_CELL_VOLTAGE_ENTITIES)
-            if (value := _convert(self.hass.states.get(entity_id), _VOLTAGE_TO_V)[0]) is not None
+            if (value := _measure(self.hass.states.get(entity_id), _VOLTAGE_TO_V).value) is not None
         ]
         return Reading(
-            soc_pct=self._number(CONF_SOC_ENTITY),
+            soc_pct=self._value(CONF_SOC_ENTITY),
             power_w=power,
-            charged_kwh=self._number(CONF_CHARGED_ENTITY),
-            discharged_kwh=self._number(CONF_DISCHARGED_ENTITY),
+            charged_kwh=self._value(CONF_CHARGED_ENTITY),
+            discharged_kwh=self._value(CONF_DISCHARGED_ENTITY),
             # The highest cell among the packs: the first to reach the full voltage
             cell_high_v=max(cells) if cells else None,
         )
 
-    def _number(self, key: str) -> float | None:
+    def _value(self, key: str) -> float | None:
         """The numeric state in the model's unit; None when not configured, unavailable, not a number or in an
         unknown unit."""
         entity_id = self._options.get(key)
-        return None if not entity_id else _convert(self.hass.states.get(entity_id), _FACTORS[key])[0]
+        return None if not entity_id else _measure(self.hass.states.get(entity_id), _FACTORS[key]).value
 
     def _unavailable_cause(self, key: str) -> str | None:
         """Why the source gives no reading, None when it gives one (the cell voltages: when none of them gives one)."""
-        causes = [_convert(self.hass.states.get(entity_id), _FACTORS[key])[1] for entity_id in self._entity_ids(key)]
-        if any(cause is None for cause in causes):
+        measures = [_measure(self.hass.states.get(entity_id), _FACTORS[key]) for entity_id in self._entity_ids(key)]
+        if any(measure.value is not None for measure in measures):
             return None
-        return causes[0]
+        return measures[0].cause
 
 
 def _names(entity_ids: list[str]) -> str:
@@ -382,20 +386,19 @@ def _iso(value: datetime | None) -> str | None:
     return None if value is None else value.isoformat()
 
 
-def _convert(state: State | None, factors: dict[str, float]) -> tuple[float | None, str | None]:
-    """The numeric state in the model's unit, or None and why."""
+def _measure(state: State | None, factors: dict[str, float]) -> Measure:
     if state is None:
-        return None, "the entity does not exist"
+        return Measure(None, "the entity does not exist")
     if state.state in ("unavailable", "unknown"):
-        return None, f"state {state.state}"
+        return Measure(None, f"state {state.state}")
     try:
         value = float(state.state)
     except ValueError:
-        return None, f"state {state.state!r} is not a number"
+        return Measure(None, f"state {state.state!r} is not a number")
     if not math.isfinite(value):  # "nan" / "inf" parse as floats
-        return None, f"state {state.state!r} is not a number"
+        return Measure(None, f"state {state.state!r} is not a number")
     unit = state.attributes.get("unit_of_measurement")
     factor = factors.get(unit) if unit is not None else 1.0
     if factor is None:
-        return None, f"unit {unit!r} is not supported"
-    return value * factor, None
+        return Measure(None, f"unit {unit!r} is not supported")
+    return Measure(value * factor)

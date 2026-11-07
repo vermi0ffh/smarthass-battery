@@ -28,16 +28,7 @@ from .const import (
     DEFAULT_FULL_CELL_V,
     DEFAULT_MAX_POWER_KW,
     DOMAIN,
-)
-
-# What reconfiguring changes; the rest is the battery (the options)
-SOURCE_OPTIONS = (
-    CONF_SOC_ENTITY,
-    CONF_POWER_ENTITY,
-    CONF_INVERT_POWER,
-    CONF_CHARGED_ENTITY,
-    CONF_DISCHARGED_ENTITY,
-    CONF_CELL_VOLTAGE_ENTITIES,
+    RECONFIGURE_KEYS,
 )
 
 
@@ -149,7 +140,7 @@ class BatteryConfigFlow(ConfigFlow, domain=DOMAIN):
             soc = user_input[CONF_SOC_ENTITY]
             if any(other.unique_id == soc for other in self._async_current_entries() if other is not entry):
                 return self.async_abort(reason="already_configured")
-            battery = {key: value for key, value in entry.options.items() if key not in SOURCE_OPTIONS}
+            battery = {key: value for key, value in entry.options.items() if key not in RECONFIGURE_KEYS}
             return self.async_update_reload_and_abort(entry, unique_id=soc, options={**battery, **user_input})
         defaults = user_input if user_input is not None else dict(entry.options)
         return self.async_show_form(step_id="reconfigure", data_schema=_sources_schema(defaults), errors=errors)
@@ -164,7 +155,7 @@ class BatteryOptionsFlow(OptionsFlowWithReload):
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors = _battery_errors(user_input) if user_input is not None else {}
         if user_input is not None and not errors:
-            sources = {key: value for key, value in self.config_entry.options.items() if key in SOURCE_OPTIONS}
+            sources = {key: value for key, value in self.config_entry.options.items() if key in RECONFIGURE_KEYS}
             return self.async_create_entry(data={**sources, **user_input})
         defaults = user_input if user_input is not None else dict(self.config_entry.options)
         return self.async_show_form(step_id="init", data_schema=_battery_schema(defaults), errors=errors)

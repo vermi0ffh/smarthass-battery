@@ -9,7 +9,6 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -20,8 +19,7 @@ from .const import (
     SERVICE_MARK_FULL,
     SERVICE_SET_ENERGY,
 )
-from .model.battery import STATE_VERSION
-from .tracker import BatteryTracker, store_key
+from .tracker import BatteryTracker, stored_state
 
 PLATFORMS = [Platform.SENSOR]
 
@@ -67,7 +65,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         tracker_of(call).mark_empty()
 
     async def set_energy(call: ServiceCall) -> None:
-        tracker_of(call).set_energy_kwh(call.data[ATTR_ENERGY_KWH])
+        tracker_of(call).set_energy(call.data[ATTR_ENERGY_KWH])
 
     hass.services.async_register(DOMAIN, SERVICE_MARK_FULL, mark_full, schema=_ENTRY_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_MARK_EMPTY, mark_empty, schema=_ENTRY_SCHEMA)
@@ -77,6 +75,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: BatteryConfigEntry) -> bool:
     tracker = BatteryTracker(hass, entry)
+    # Stopped (listeners off, estimate saved) at unload, and also when the setup fails after it started
+    entry.async_on_unload(tracker.async_stop)
     await tracker.async_start()
     entry.runtime_data = tracker
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -84,12 +84,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: BatteryConfigEntry) -> b
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: BatteryConfigEntry) -> bool:
-    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unloaded:
-        await entry.runtime_data.async_stop()
-    return unloaded
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: BatteryConfigEntry) -> None:
     """The battery deleted: its stored estimate goes with it."""
-    await Store[dict](hass, STATE_VERSION, store_key(entry.entry_id)).async_remove()
+    await stored_state(hass, entry.entry_id).async_remove()

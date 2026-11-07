@@ -27,10 +27,10 @@ PARALLEL_UPDATES = 0
 
 @dataclass(frozen=True, kw_only=True)
 class BatterySensorDescription(SensorEntityDescription):
-    value: Callable[[BatteryTracker], float | datetime | None]
+    value_fn: Callable[[BatteryTracker], float | datetime | None]
     # Unavailable while the flows' sources are (the learned values and the last landmark stay known facts)
     needs_sources: bool = False
-    attributes: Callable[[BatteryTracker], dict[str, Any]] | None = None
+    attributes_fn: Callable[[BatteryTracker], dict[str, Any]] | None = None
 
 
 def _pct(value: float | None) -> float | None:
@@ -42,13 +42,13 @@ SENSORS = (
         key="energy",
         needs_sources=True,
         # Everything a planner needs in one entity (contract, doc/agents/architecture.md)
-        attributes=lambda t: t.planner_attributes(),
+        attributes_fn=BatteryTracker.planner_attributes,
         translation_key="energy",
         device_class=SensorDeviceClass.ENERGY_STORAGE,
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
-        value=lambda t: t.battery.energy_kwh,
+        value_fn=lambda t: t.battery.energy_kwh,
     ),
     BatterySensorDescription(
         key="soc",
@@ -58,7 +58,7 @@ SENSORS = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
-        value=lambda t: t.battery.soc_pct,
+        value_fn=lambda t: t.battery.soc_pct,
     ),
     BatterySensorDescription(
         key="room",
@@ -68,7 +68,7 @@ SENSORS = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
-        value=lambda t: t.battery.room_kwh,
+        value_fn=lambda t: t.battery.room_kwh,
     ),
     BatterySensorDescription(
         key="uncertainty",
@@ -79,7 +79,7 @@ SENSORS = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
-        value=lambda t: t.battery.uncertainty_kwh,
+        value_fn=lambda t: t.battery.uncertainty_kwh,
     ),
     BatterySensorDescription(
         key="learned_efficiency",
@@ -88,8 +88,8 @@ SENSORS = (
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
-        attributes=lambda t: t.efficiency_attributes(),
-        value=lambda t: _pct(t.battery.learned_efficiency),
+        attributes_fn=BatteryTracker.efficiency_attributes,
+        value_fn=lambda t: _pct(t.battery.learned_efficiency),
     ),
     BatterySensorDescription(
         key="learned_full_energy",
@@ -99,16 +99,16 @@ SENSORS = (
         native_unit_of_measurement=UnitOfEnergy.KILO_WATT_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=2,
-        attributes=lambda t: t.full_energy_attributes(),
-        value=lambda t: t.battery.learned_full_energy_kwh,
+        attributes_fn=BatteryTracker.full_energy_attributes,
+        value_fn=lambda t: t.battery.learned_full_energy_kwh,
     ),
     BatterySensorDescription(
         key="last_landmark",
         translation_key="last_landmark",
         device_class=SensorDeviceClass.TIMESTAMP,
         entity_category=EntityCategory.DIAGNOSTIC,
-        attributes=lambda t: t.landmark_attributes(),
-        value=lambda t: t.battery.last_landmark_at,
+        attributes_fn=BatteryTracker.landmark_attributes,
+        value_fn=lambda t: t.battery.last_landmark_at,
     ),
 )
 
@@ -136,8 +136,8 @@ class BatterySensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        attributes = self.entity_description.attributes
-        return None if attributes is None else attributes(self._tracker)
+        attributes_fn = self.entity_description.attributes_fn
+        return None if attributes_fn is None else attributes_fn(self._tracker)
 
     @property
     def available(self) -> bool:
@@ -145,7 +145,7 @@ class BatterySensor(SensorEntity):
 
     @property
     def native_value(self) -> float | datetime | None:
-        return self.entity_description.value(self._tracker)
+        return self.entity_description.value_fn(self._tracker)
 
     async def async_added_to_hass(self) -> None:
         self.async_on_remove(self._tracker.add_listener(self.async_write_ha_state))

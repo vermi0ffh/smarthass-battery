@@ -16,7 +16,8 @@ model/  ←  tracker.py  ←  sensor.py, diagnostics.py, __init__.py (setup, ser
   highest of the cell voltages that read), updates the model on every state change (time = the event's
   `time_fired`) and every minute (`REFRESH_INTERVAL`: the power is counted at its last value while it holds),
   persists its state, and notifies the entities.
-- **`__init__.py`**: setup and unload of an entry, the services (registered once in `async_setup`, refused with a
+- **`__init__.py`**: setup and unload of an entry (the tracker's stop registered with `async_on_unload`: it also
+  runs when the setup fails after the tracker started), the services (registered once in `async_setup`, refused with a
   translated error for an unknown entry, `set_energy` refusing a non-finite value), the stored state removed with
   the entry.
 - **`config_flow.py`**: the user step (name, sources, battery), `reconfigure` (the sources only; the battery and the
@@ -43,9 +44,12 @@ both meters read), or a meter unreadable without a power.
 
 ## Persistence
 
-`Store` `smart_hass_battery.<entry_id>`, version `STATE_VERSION`: `state_to_dict` of the model plus `sources` (the
-entity ids the state was measured with). Saved 30 s after a change (`SAVE_DELAY_S`) and at unload. At start: the
-state restored, `resume()` (the power is not held over the downtime: the meters count it), `forget_meters()` when the
+`Store` `smart_hass_battery.<entry_id>` (`stored_state`), version `STORAGE_VERSION` (1): `state_to_dict` of the
+model, which carries its own `version`, plus `sources` (the entity ids the state was measured with). The Store's
+version stays 1 when the model's format changes (Home Assistant refuses a file of another major version without a
+migration); `state_from_dict` reads the model's older formats. Saved 30 s after a change (`SAVE_DELAY_S`) and at
+unload, after counting the interval since the last update. At start: an unreadable file starts from the state of
+charge; the state restored, `resume()` (the power is not held over the downtime: the meters count it), `forget_meters()` when the
 stored meters differ from the configured ones (reconfigured).
 
 ## Entities (a contract, rule 20)

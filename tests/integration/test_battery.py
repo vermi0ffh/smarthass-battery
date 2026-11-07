@@ -139,12 +139,13 @@ async def test_options_flow_reloads_with_the_new_battery(hass: HomeAssistant) ->
     assert result["errors"] == {"base": "full_energy_above_capacity"}
 
 
-async def test_reconfigure_replaces_the_meters(hass: HomeAssistant) -> None:
+async def test_reconfigure_replaces_the_meters(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
     """New meters' values are no flow: counted from their first reading. The battery and its estimate stay."""
     _measures(hass)
     _meters(hass, 5.0, 3.0)
-    hass.states.async_set("sensor.new_in", "100", {"unit_of_measurement": "kWh"})
-    hass.states.async_set("sensor.new_out", "200", {"unit_of_measurement": "kWh"})
+    # Close to the old ones: taken for an increase of them, 1 kWh out would be counted
+    hass.states.async_set("sensor.new_in", "5", {"unit_of_measurement": "kWh"})
+    hass.states.async_set("sensor.new_out", "4", {"unit_of_measurement": "kWh"})
     entry = await _setup(hass, {**OPTIONS, "charged_entity": CHARGED, "discharged_entity": DISCHARGED})
     await _call(hass, "set_energy", entry, energy_kwh=10.0)
     result = await entry.start_reconfigure_flow(hass)
@@ -155,6 +156,15 @@ async def test_reconfigure_replaces_the_meters(hass: HomeAssistant) -> None:
     await hass.async_block_till_done()
     assert entry.options == {**BATTERY, **sources}
     assert _value(hass, ENERGY) == pytest.approx(10.0, abs=0.01)
+    hass.states.async_set("sensor.new_out", "5.5", {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+    assert _value(hass, ENERGY) == pytest.approx(10.0, abs=0.01)  # the power counted it (0 W): no gap to fill
+    hass.states.async_set(POWER, "unavailable")
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(minutes=10))  # a meter's increase is bounded by the maximum power over the time elapsed
+    hass.states.async_set("sensor.new_out", "6.5", {"unit_of_measurement": "kWh"})
+    await hass.async_block_till_done()
+    assert _value(hass, ENERGY) == pytest.approx(9.0, abs=0.01)  # the new meter counts the power's gap
 
 
 async def test_reconfigure_checks_the_sources(hass: HomeAssistant) -> None:
@@ -163,6 +173,10 @@ async def test_reconfigure_checks_the_sources(hass: HomeAssistant) -> None:
     result = await entry.start_reconfigure_flow(hass)
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"soc_entity": SOC})
     assert result["type"] is FlowResultType.FORM and result["errors"] == {"base": "no_flow_source"}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"soc_entity": SOC, "discharged_entity": DISCHARGED}
+    )
+    assert result["errors"] == {"base": "one_meter"}
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"soc_entity": "sensor.other_soc", "power_entity": POWER}
     )
@@ -245,6 +259,9 @@ async def test_the_services_refuse_an_unknown_entry_or_energy(hass: HomeAssistan
         await hass.services.async_call(DOMAIN, "mark_full", {"config_entry_id": "nope"}, blocking=True)
     with pytest.raises(Invalid):
         await _call(hass, "set_energy", entry, energy_kwh="nan")
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    with pytest.raises(ServiceValidationError):
+        await _call(hass, "mark_full", entry)
 
 
 async def test_learned_values_published(hass: HomeAssistant) -> None:
@@ -305,6 +322,45 @@ async def test_the_meters_count_the_downtime(hass: HomeAssistant, freezer: Froze
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert _value(hass, ENERGY) == pytest.approx(8.0, abs=0.01)
+
+
+async def test_unloading_counts_the_last_interval(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    _measures(hass)
+    entry = await _setup(hass)
+    await _call(hass, "set_energy", entry, energy_kwh=8.0)
+    hass.states.async_set(POWER, "6000", {"unit_of_measurement": "W"})
+    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=59))  # before the next refresh
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert _value(hass, ENERGY) == pytest.approx(8.0 + 0.96 * 6.0 * 59 / 3600, abs=0.002)
+
+
+@pytest.mark.parametrize("stored", [[1, 2], {"energy_kwh": "x", "sources": "y"}])
+async def test_an_unreadable_stored_state_starts_from_the_state_of_charge(
+    hass: HomeAssistant, hass_storage: dict, stored: object
+) -> None:
+    hass_storage[f"{DOMAIN}.battery"] = {"version": 1, "key": f"{DOMAIN}.battery", "data": stored}
+    _measures(hass, soc_pct=54.5)
+    await _setup(hass, entry_id="battery")
+    assert _value(hass, ENERGY) == pytest.approx(FULL_KWH / 2, abs=0.001)
+
+
+@pytest.mark.parametrize(("unit", "factor"), [("Wh", 1000.0), ("kWh", 1.0), ("MWh", 0.001)])
+async def test_meters_alone_in_any_energy_unit(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, unit: str, factor: float
+) -> None:
+    _measures(hass)
+    options = {**BATTERY, "soc_entity": SOC, "charged_entity": CHARGED, "discharged_entity": DISCHARGED}
+    hass.states.async_set(CHARGED, str(5.0 * factor), {"unit_of_measurement": unit})
+    hass.states.async_set(DISCHARGED, str(3.0 * factor), {"unit_of_measurement": unit})
+    entry = await _setup(hass, options)
+    await _call(hass, "set_energy", entry, energy_kwh=8.0)
+    freezer.tick(timedelta(minutes=10))
+    hass.states.async_set(CHARGED, str(6.0 * factor), {"unit_of_measurement": unit})
+    hass.states.async_set(DISCHARGED, str(3.5 * factor), {"unit_of_measurement": unit})
+    await hass.async_block_till_done()
+    assert _value(hass, ENERGY) == pytest.approx(8.0 + 0.96 - 0.5, abs=0.01)
 
 
 async def test_deleting_the_battery_removes_its_stored_estimate(hass: HomeAssistant, hass_storage: dict) -> None:
