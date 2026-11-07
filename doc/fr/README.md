@@ -105,6 +105,70 @@ puissance n'est pas supposée tenue.
   charge corrigé, qui ne tient pas 89 % pendant que 2 kWh entrent encore.
 - **Suivre le vieillissement** : l'énergie entre les repères apprise baisse quand la batterie perd de la capacité.
 
+## Exemples
+
+Les identifiants ci-dessous sont ceux d'une batterie nommée *Battery*, avec Home Assistant en anglais ; les vôtres
+suivent le nom donné et la langue de Home Assistant à sa création.
+
+Arrêter une charge de nuit depuis le réseau une fois 12 kWh stockés (`switch.grid_charge` représente ce que
+l'intégration de votre onduleur propose pour autoriser la charge réseau) :
+
+```yaml
+automation:
+  - alias: Batterie - arrêt de la charge de nuit à 12 kWh
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.battery_stored_energy
+        above: 12
+    conditions:
+      - condition: time
+        after: "22:00:00"
+        before: "06:00:00"
+    actions:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.grid_charge
+```
+
+Une notification quand il reste moins de 2 kWh, avec la confiance qu'on peut y accorder :
+
+```yaml
+automation:
+  - alias: Batterie - basse
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.battery_stored_energy
+        below: 2
+    actions:
+      - action: notify.notify
+        data:
+          message: >-
+            Il reste {{ states('sensor.battery_stored_energy') | float | round(1) }} kWh
+            (± {{ state_attr('sensor.battery_stored_energy', 'uncertainty_kwh') | round(1) }} kWh).
+```
+
+Une charge complète au moins une fois par semaine, pour que le repère plein et l'apprentissage restent frais :
+
+```yaml
+automation:
+  - alias: Batterie - charge complète hebdomadaire
+    triggers:
+      - trigger: time
+        at: "22:00:00"
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ state_attr('sensor.battery_stored_energy', 'last_landmark') != 'full'
+             or (now() - as_datetime(state_attr('sensor.battery_stored_energy', 'last_landmark_at'))).days >= 7 }}
+    actions:
+      - action: switch.turn_on
+        target:
+          entity_id: switch.grid_charge
+```
+
+Les attributs de l'énergie sont ce dont un planificateur a besoin : `full_energy_kwh` (l'énergie entre les repères
+utilisée), `efficiency` (le rendement utilisé), `room_kwh`, `uncertainty_kwh`, `empty_soc_pct`, les entités sources.
+
 ## Limites connues
 
 - **Comptage DC** : les pertes des onduleurs (côté AC) ne sont pas comptées ; le rendement est celui de la batterie.

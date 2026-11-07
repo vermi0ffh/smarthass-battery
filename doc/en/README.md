@@ -102,6 +102,70 @@ after a restart, the energy meters (if any) count the downtime, the power is not
   charge, which does not hold at 89 % while 2 kWh still go in.
 - **Watch the battery age**: the learned energy between the landmarks falls as the battery loses capacity.
 
+## Examples
+
+The entity ids below are those of a battery named *Battery*, with Home Assistant in English; yours follow the name
+you gave and Home Assistant's language when it was created.
+
+Stop a night charge from the grid once 12 kWh are stored (`switch.grid_charge` stands for what your inverter's
+integration offers to allow the grid charge):
+
+```yaml
+automation:
+  - alias: Battery - stop the night charge at 12 kWh
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.battery_stored_energy
+        above: 12
+    conditions:
+      - condition: time
+        after: "22:00:00"
+        before: "06:00:00"
+    actions:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.grid_charge
+```
+
+A notification when less than 2 kWh are left, with how far to trust it:
+
+```yaml
+automation:
+  - alias: Battery - low
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.battery_stored_energy
+        below: 2
+    actions:
+      - action: notify.notify
+        data:
+          message: >-
+            {{ states('sensor.battery_stored_energy') | float | round(1) }} kWh left
+            (± {{ state_attr('sensor.battery_stored_energy', 'uncertainty_kwh') | round(1) }} kWh).
+```
+
+A charge to the top at least once a week, so the full landmark and the learning stay fresh:
+
+```yaml
+automation:
+  - alias: Battery - weekly full charge
+    triggers:
+      - trigger: time
+        at: "22:00:00"
+    conditions:
+      - condition: template
+        value_template: >-
+          {{ state_attr('sensor.battery_stored_energy', 'last_landmark') != 'full'
+             or (now() - as_datetime(state_attr('sensor.battery_stored_energy', 'last_landmark_at'))).days >= 7 }}
+    actions:
+      - action: switch.turn_on
+        target:
+          entity_id: switch.grid_charge
+```
+
+The energy's attributes are what a planner needs: `full_energy_kwh` (the energy between the landmarks in use),
+`efficiency` (the round trip in use), `room_kwh`, `uncertainty_kwh`, `empty_soc_pct`, the source entities.
+
 ## Known limitations
 
 - **DC counting**: the inverters' losses (AC side) are not counted; the round trip is the battery's.
