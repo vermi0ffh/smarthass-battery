@@ -349,6 +349,33 @@ def test_landmarks_told_by_the_user_with_an_estimate():
     assert b.last_landmark_at == at(1)
 
 
+def test_the_last_full_and_empty_times_outlive_the_counting_s_restarts():
+    b = battery(soc_pct=10.0)
+    assert b.last_full_at is None and b.last_empty_at is None
+    b.update(at(0), Reading(9.0, power_w=2000.0, cell_high_v=3.2))
+    b.update(at(540), Reading(97.0, power_w=-1000.0, cell_high_v=3.5))
+    assert (b.last_full_at, b.last_empty_at) == (at(540), at(0))
+    # Neither an energy set by the user nor a restart from the state of charge is a landmark: both times stay
+    b.set_energy(at(600), 8.0)
+    b.update(at(601), Reading(90.0, power_w=0.0, cell_high_v=3.3))
+    assert b.last_landmark is None
+    assert (b.last_full_at, b.last_empty_at) == (at(540), at(0))
+    # A landmark told counts as one
+    b.mark_empty(at(700))
+    assert (b.last_full_at, b.last_empty_at) == (at(540), at(700))
+    b.mark_full(at(800))
+    assert (b.last_full_at, b.last_empty_at) == (at(800), at(700))
+
+
+@pytest.mark.parametrize(
+    ("start", "full_at", "empty_at"),
+    [("full", T0, None), ("empty", None, T0), ("soc", None, None)],
+)
+def test_a_state_saved_by_0_1_0_knows_its_last_landmark_from_its_start(start, full_at, empty_at):
+    state = state_from_dict({"version": 1, "energy_kwh": 5.0, "start": start, "start_at": T0.isoformat()})
+    assert (state.last_full_at, state.last_empty_at) == (full_at, empty_at)
+
+
 def test_the_state_carries_its_version():
     assert state_to_dict(BatteryState())["version"] == STATE_VERSION
 

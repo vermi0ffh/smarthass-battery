@@ -147,6 +147,10 @@ class BatteryState:
     since_full: Cycle = field(default_factory=Cycle)
     since_empty: Cycle = field(default_factory=Cycle)
     last_landmark_kind: str | None = None  # the kind of the latest landmark seen (FULL, EMPTY), None before any
+    # When the battery was last at each landmark, seen or told: a restart from the state of charge or a set energy
+    # keeps them, unlike last_landmark (a planner asks how long since the battery was full)
+    last_full_at: datetime | None = None
+    last_empty_at: datetime | None = None
     # Learned: the round trip's decayed totals (out / in) and the energy between the landmarks; None = nothing yet
     efficiency_in_kwh: float = 0.0
     efficiency_out_kwh: float = 0.0
@@ -195,6 +199,8 @@ def state_to_dict(state: BatteryState) -> dict[str, Any]:
         "learned_full_energy_kwh": state.learned_full_energy_kwh,
         "full_energy_cycles": state.full_energy_cycles,
         "last_landmark_error_kwh": state.last_landmark_error_kwh,
+        "last_full_at": _iso(state.last_full_at),
+        "last_empty_at": _iso(state.last_empty_at),
     }
 
 
@@ -215,10 +221,14 @@ def state_from_dict(data: Any) -> BatteryState:
     efficiency_out = _non_negative(data.get("efficiency_out_kwh"))
     has_ratio = efficiency_in > 0 and efficiency_out > 0
     learned_full = _positive(data.get("learned_full_energy_kwh"))
+    start_at = _parse(data.get("start_at"))
+    # A state saved by 0.1.0 has no last_full_at / last_empty_at: the start of its counting is the last one it knows
+    last_full = _parse(data["last_full_at"]) if "last_full_at" in data else start_at if start == FULL else None
+    last_empty = _parse(data["last_empty_at"]) if "last_empty_at" in data else start_at if start == EMPTY else None
     return BatteryState(
         energy_kwh=energy if start is not None else None,
         start=start if energy is not None else None,
-        start_at=_parse(data.get("start_at")),
+        start_at=start_at,
         counted_kwh=_non_negative(data.get("counted_kwh")),
         updated_at=_parse(data.get("updated_at")),
         reading=Reading(
@@ -245,6 +255,8 @@ def state_from_dict(data: Any) -> BatteryState:
         learned_full_energy_kwh=learned_full,
         full_energy_cycles=_count(data.get("full_energy_cycles")) if learned_full is not None else 0,
         last_landmark_error_kwh=_float(data.get("last_landmark_error_kwh")),
+        last_full_at=last_full,
+        last_empty_at=last_empty,
     )
 
 
@@ -371,6 +383,16 @@ class Battery:
     @property
     def last_landmark_error_kwh(self) -> float | None:
         return self.state.last_landmark_error_kwh
+
+    @property
+    def last_full_at(self) -> datetime | None:
+        """When the battery was last full (its full landmark seen or told), whatever the counting restarted from
+        since; None before any."""
+        return self.state.last_full_at
+
+    @property
+    def last_empty_at(self) -> datetime | None:
+        return self.state.last_empty_at
 
     # --- Updating ---
 
@@ -560,8 +582,10 @@ class Battery:
         state.counted_kwh = 0.0
         if start == FULL:
             state.full_armed = False
+            state.last_full_at = at
         elif start == EMPTY:
             state.empty_armed = False
+            state.last_empty_at = at
 
     def _from_soc(self, soc_pct: float) -> float:
         empty = self.config.empty_soc_pct

@@ -12,7 +12,7 @@ from .model import state_to_dict
 async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: BatteryConfigEntry) -> dict[str, Any]:
     tracker = entry.runtime_data
     battery = tracker.battery
-    landmark_at = battery.last_landmark_at
+    landmark_at, full_at, empty_at = battery.last_landmark_at, battery.last_full_at, battery.last_empty_at
     return {
         "options": dict(entry.options),
         "estimate": {
@@ -27,6 +27,8 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Battery
             "last_landmark": battery.last_landmark,
             "last_landmark_at": None if landmark_at is None else landmark_at.isoformat(),
             "last_landmark_error_kwh": battery.last_landmark_error_kwh,
+            "last_full_at": None if full_at is None else full_at.isoformat(),
+            "last_empty_at": None if empty_at is None else empty_at.isoformat(),
             "available": tracker.estimate_available,
         },
         "state": state_to_dict(battery.state),
