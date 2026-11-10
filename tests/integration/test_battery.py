@@ -259,13 +259,8 @@ async def test_the_energy_tells_when_the_battery_was_last_full_and_empty(
 ) -> None:
     _measures(hass, soc_pct=10.0)
     entry = await _setup(hass)
-    assert (
-        hass.states.get(ENERGY).attributes["last_full_at"],
-        hass.states.get(ENERGY).attributes["last_empty_at"],
-    ) == (
-        None,
-        None,
-    )
+    attributes = hass.states.get(ENERGY).attributes
+    assert (attributes["last_full_at"], attributes["last_empty_at"]) == (None, None)
     hass.states.async_set(SOC, "9", {"unit_of_measurement": "%"})
     await hass.async_block_till_done()
     empty_at = hass.states.get(ENERGY).attributes["last_empty_at"]

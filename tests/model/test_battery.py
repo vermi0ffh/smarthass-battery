@@ -376,6 +376,20 @@ def test_a_state_saved_by_0_1_0_knows_its_last_landmark_from_its_start(start, fu
     assert (state.last_full_at, state.last_empty_at) == (full_at, empty_at)
 
 
+def test_a_last_full_time_saved_unknown_stays_unknown():
+    stored = {"energy_kwh": 5.0, "start": "full", "start_at": T0.isoformat(), "last_full_at": None}
+    assert state_from_dict(stored).last_full_at is None
+
+
+def test_the_last_full_and_empty_times_survive_a_restart():
+    b = battery(soc_pct=10.0)
+    b.update(at(0), Reading(9.0, power_w=2000.0, cell_high_v=3.2))
+    b.update(at(540), Reading(97.0, power_w=0.0, cell_high_v=3.5))
+    b.set_energy(at(600), 8.0)
+    restored = Battery(CONFIG, state_from_dict(state_to_dict(b.state)))
+    assert (restored.last_full_at, restored.last_empty_at) == (at(540), at(0))
+
+
 def test_the_state_carries_its_version():
     assert state_to_dict(BatteryState())["version"] == STATE_VERSION
 

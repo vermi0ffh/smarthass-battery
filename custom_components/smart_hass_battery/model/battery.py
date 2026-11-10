@@ -222,9 +222,6 @@ def state_from_dict(data: Any) -> BatteryState:
     has_ratio = efficiency_in > 0 and efficiency_out > 0
     learned_full = _positive(data.get("learned_full_energy_kwh"))
     start_at = _parse(data.get("start_at"))
-    # A state saved by 0.1.0 has no last_full_at / last_empty_at: the start of its counting is the last one it knows
-    last_full = _parse(data["last_full_at"]) if "last_full_at" in data else start_at if start == FULL else None
-    last_empty = _parse(data["last_empty_at"]) if "last_empty_at" in data else start_at if start == EMPTY else None
     return BatteryState(
         energy_kwh=energy if start is not None else None,
         start=start if energy is not None else None,
@@ -255,9 +252,18 @@ def state_from_dict(data: Any) -> BatteryState:
         learned_full_energy_kwh=learned_full,
         full_energy_cycles=_count(data.get("full_energy_cycles")) if learned_full is not None else 0,
         last_landmark_error_kwh=_float(data.get("last_landmark_error_kwh")),
-        last_full_at=last_full,
-        last_empty_at=last_empty,
+        last_full_at=_last_at(data, FULL, start, start_at),
+        last_empty_at=_last_at(data, EMPTY, start, start_at),
     )
+
+
+def _last_at(data: dict[str, Any], kind: str, start: str | None, start_at: datetime | None) -> datetime | None:
+    """When the battery was last at the `kind` landmark. A state saved by 0.1.0 has no such field: the start of its
+    counting, when it is that landmark, is the last one it knows."""
+    key = f"last_{kind}_at"
+    if key in data:
+        return _parse(data[key])
+    return start_at if start == kind else None
 
 
 def _cycle_to_dict(cycle: Cycle) -> dict[str, Any]:
