@@ -3,7 +3,7 @@
 Versions follow [semantic versioning](https://semver.org/). Before 1.0.0, a minor version may change the options or
 the entities; such a change is described here, with what to do.
 
-## Unreleased
+## 0.2.0 (2026-11-10)
 
 - **Entities**: the stored energy's `last_full_at` and `last_empty_at` attributes (and the diagnostics): when the
   battery was last full and empty, seen or told. Unlike `last_landmark_at`, they survive a restart of the counting
