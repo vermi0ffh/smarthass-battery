@@ -194,6 +194,8 @@ class BatteryTracker:
             "soc_pct": _round(battery.soc_pct, 1),
             "last_landmark": battery.last_landmark,
             "last_landmark_at": _iso(battery.last_landmark_at),
+            "last_full_at": _iso(battery.last_full_at),
+            "last_empty_at": _iso(battery.last_empty_at),
             **{key: self._options.get(key) for key in ENTITY_KEYS},
         }
 

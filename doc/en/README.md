@@ -66,7 +66,7 @@ it (*Reconfigure* in its menu): the estimate stays, replaced meters are counted 
 
 | Entity | Unit | Description |
 |--------|------|-------------|
-| Stored energy | kWh | What the battery can still deliver above the empty threshold; its attributes give a planner the battery (capacity, energy between the landmarks and round trip in use, empty threshold), the room, the uncertainty, the last landmark and the source entities |
+| Stored energy | kWh | What the battery can still deliver above the empty threshold; its attributes give a planner the battery (capacity, energy between the landmarks and round trip in use, empty threshold), the room, the uncertainty, the last landmark, the last full and empty times and the source entities |
 | State of charge | % | The stored energy on the BMS's scale (the empty threshold at empty, 100 % at full), linear in energy |
 | Room to full | kWh | What it can still take before full, in delivered kWh |
 | Uncertainty (diagnostic) | kWh | How far the estimate may be off: that of its start (full 0.4 kWh, empty 0.8, the state of charge 2, set by hand 0.5) plus 2 % of what flowed since |
@@ -155,8 +155,8 @@ automation:
     conditions:
       - condition: template
         value_template: >-
-          {{ state_attr('sensor.battery_stored_energy', 'last_landmark') != 'full'
-             or (now() - as_datetime(state_attr('sensor.battery_stored_energy', 'last_landmark_at'))).days >= 7 }}
+          {{ state_attr('sensor.battery_stored_energy', 'last_full_at') is none
+             or (now() - as_datetime(state_attr('sensor.battery_stored_energy', 'last_full_at'))).days >= 7 }}
     actions:
       - action: switch.turn_on
         target:
@@ -164,7 +164,9 @@ automation:
 ```
 
 The energy's attributes are what a planner needs: `full_energy_kwh` (the energy between the landmarks in use),
-`efficiency` (the round trip in use), `room_kwh`, `uncertainty_kwh`, `empty_soc_pct`, the source entities.
+`efficiency` (the round trip in use), `room_kwh`, `uncertainty_kwh`, `empty_soc_pct`, `last_full_at` and
+`last_empty_at` (when the battery was last full and empty, kept when the counting restarts from the state of charge
+or a set energy), the source entities.
 
 ## Known limitations
 

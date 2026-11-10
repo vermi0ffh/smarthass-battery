@@ -50,7 +50,10 @@ The counting restarts from a landmark, where the battery's state is known:
   of charge rose 2 points above the threshold (`EMPTY_REARM_PCT`): it jitters around it.
 
 `last_landmark_error_kwh` keeps, at each landmark, how far the counting was from it. Measured spread: ±0.4 kWh at the
-full landmark between 4 cycles, ±0.8 kWh at the empty one between 8.
+full landmark between 4 cycles, ±0.8 kWh at the empty one between 8. `last_full_at` / `last_empty_at` keep when
+each landmark was last reached, seen or told (`mark_full`, `mark_empty`): unlike `last_landmark_at` (the counting's
+start), a restart from the state of charge or `set_energy` keeps them, and a landmark of the other kind keeps the
+first one's (a planner charging to full every few days reads `last_full_at`).
 
 Without an estimate (first start, an unreadable stored state), the first state of charge starts the counting
 (`start = "soc"`): `(soc − empty) / (100 − empty) × full_energy_kwh`. When the counting and that value disagree by more
@@ -94,7 +97,8 @@ cycles in progress are incomplete).
 
 `state_to_dict` / `state_from_dict`, format `STATE_VERSION` (1, written as `version`; absent = 1). A missing or unreadable field takes its default; an
 unreadable estimate or start makes the estimate unknown (it starts again from the state of charge), an unreadable
-cycle is incomplete, unreadable learned totals are dropped.
+cycle is incomplete, unreadable learned totals are dropped. A state saved by 0.1.0 has no `last_full_at` /
+`last_empty_at`: the counting's start, when it is a landmark, gives the matching one.
 
 ## Validation on a real battery (rule 25)
 

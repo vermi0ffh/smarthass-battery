@@ -58,7 +58,7 @@ Unique id `<entry_id>_<key>`, one device per entry.
 
 | Key | Unit, class | Value | Attributes |
 |-----|-------------|-------|------------|
-| `energy` | kWh, `energy_storage`, measurement | `energy_kwh` | For a planner: `nominal_capacity_kwh`, `full_energy_kwh` and `efficiency` in use, `empty_soc_pct`, `room_kwh`, `uncertainty_kwh`, `soc_pct`, `last_landmark`, `last_landmark_at`, the source entity ids |
+| `energy` | kWh, `energy_storage`, measurement | `energy_kwh` | For a planner: `nominal_capacity_kwh`, `full_energy_kwh` and `efficiency` in use, `empty_soc_pct`, `room_kwh`, `uncertainty_kwh`, `soc_pct`, `last_landmark`, `last_landmark_at`, `last_full_at`, `last_empty_at` (the last full and empty landmarks, seen or told, kept through a restart from the state of charge or a set energy), the source entity ids |
 | `soc` | %, `battery`, measurement | `soc_pct` (corrected) | |
 | `room` | kWh, `energy_storage`, measurement | `room_kwh` | |
 | `uncertainty` | kWh, diagnostic | `uncertainty_kwh` | |

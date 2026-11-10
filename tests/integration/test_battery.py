@@ -12,6 +12,7 @@ from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.setup import async_setup_component
+from homeassistant.util import dt as dt_util
 from probatio import Invalid
 from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 from pytest_homeassistant_custom_component.components.diagnostics import get_diagnostics_for_config_entry
@@ -251,6 +252,27 @@ async def test_the_empty_landmark_and_the_user_s_landmarks(hass: HomeAssistant) 
     assert _value(hass, "sensor.battery_uncertainty") == pytest.approx(0.4)
     await _call(hass, "mark_empty", entry)
     assert _value(hass, ENERGY) == 0.0 and hass.states.get(LANDMARK).attributes["kind"] == "empty"
+
+
+async def test_the_energy_tells_when_the_battery_was_last_full_and_empty(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    _measures(hass, soc_pct=10.0)
+    entry = await _setup(hass)
+    attributes = hass.states.get(ENERGY).attributes
+    assert (attributes["last_full_at"], attributes["last_empty_at"]) == (None, None)
+    hass.states.async_set(SOC, "9", {"unit_of_measurement": "%"})
+    await hass.async_block_till_done()
+    empty_at = hass.states.get(ENERGY).attributes["last_empty_at"]
+    assert empty_at == dt_util.utcnow().isoformat()
+    freezer.tick(timedelta(hours=1))
+    await _call(hass, "mark_full", entry)
+    full_at = dt_util.utcnow().isoformat()
+    # A set energy is no landmark: the last landmark is gone, not when the battery was full or empty
+    await _call(hass, "set_energy", entry, energy_kwh=8.0)
+    attributes = hass.states.get(ENERGY).attributes
+    assert attributes["last_landmark"] is None
+    assert (attributes["last_full_at"], attributes["last_empty_at"]) == (full_at, empty_at)
 
 
 async def test_the_services_refuse_an_unknown_entry_or_energy(hass: HomeAssistant) -> None:
@@ -505,6 +527,7 @@ async def test_diagnostics_show_the_estimate_and_the_sources(
     assert diagnostics["options"] == OPTIONS
     assert diagnostics["estimate"]["energy_kwh"] == pytest.approx(8.0, abs=0.01)
     assert diagnostics["estimate"]["available"] is True
+    assert (diagnostics["estimate"]["last_full_at"], diagnostics["estimate"]["last_empty_at"]) == (None, None)
     assert diagnostics["state"]["energy_kwh"] == pytest.approx(diagnostics["estimate"]["energy_kwh"])
     assert diagnostics["sources"]["soc_entity"]["state"] == "54.5"
     assert diagnostics["sources"]["power_entity"]["unit"] == "W"

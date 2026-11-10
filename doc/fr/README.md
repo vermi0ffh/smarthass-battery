@@ -68,7 +68,7 @@ première lecture.
 
 | Entité | Unité | Description |
 |--------|-------|-------------|
-| Énergie stockée | kWh | Ce que la batterie peut encore rendre au-dessus du seuil vide ; ses attributs donnent à un planificateur la batterie (capacité, énergie entre les repères et rendement utilisés, seuil vide), la place, l'incertitude, le dernier repère et les entités sources |
+| Énergie stockée | kWh | Ce que la batterie peut encore rendre au-dessus du seuil vide ; ses attributs donnent à un planificateur la batterie (capacité, énergie entre les repères et rendement utilisés, seuil vide), la place, l'incertitude, le dernier repère, les derniers plein et vide, et les entités sources |
 | État de charge | % | L'énergie stockée sur l'échelle du BMS (le seuil vide à vide, 100 % à pleine), linéaire en énergie |
 | Place restante | kWh | Ce qu'elle peut encore prendre avant pleine, en kWh rendus |
 | Incertitude (diagnostic) | kWh | De combien l'estimation peut se tromper : celle de son départ (pleine 0,4 kWh, vide 0,8, l'état de charge 2, fixée à la main 0,5) plus 2 % de ce qui a circulé depuis |
@@ -158,8 +158,8 @@ automation:
     conditions:
       - condition: template
         value_template: >-
-          {{ state_attr('sensor.battery_stored_energy', 'last_landmark') != 'full'
-             or (now() - as_datetime(state_attr('sensor.battery_stored_energy', 'last_landmark_at'))).days >= 7 }}
+          {{ state_attr('sensor.battery_stored_energy', 'last_full_at') is none
+             or (now() - as_datetime(state_attr('sensor.battery_stored_energy', 'last_full_at'))).days >= 7 }}
     actions:
       - action: switch.turn_on
         target:
@@ -167,7 +167,9 @@ automation:
 ```
 
 Les attributs de l'énergie sont ce dont un planificateur a besoin : `full_energy_kwh` (l'énergie entre les repères
-utilisée), `efficiency` (le rendement utilisé), `room_kwh`, `uncertainty_kwh`, `empty_soc_pct`, les entités sources.
+utilisée), `efficiency` (le rendement utilisé), `room_kwh`, `uncertainty_kwh`, `empty_soc_pct`, `last_full_at` et
+`last_empty_at` (quand la batterie a été pleine et vide pour la dernière fois, gardés quand le comptage repart de l'état
+de charge ou d'une énergie donnée), les entités sources.
 
 ## Limites connues
 
