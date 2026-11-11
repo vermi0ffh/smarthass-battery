@@ -11,6 +11,7 @@ from custom_components.smart_hass_battery.model.battery import (
     Battery,
     BatteryConfig,
     BatteryState,
+    LearnedStatus,
     Reading,
     state_from_dict,
     state_to_dict,
@@ -286,6 +287,45 @@ def test_a_learned_value_is_used_only_from_five_cycles_and_with_learning_on():
     for minutes, soc, power, cell in ((0, 97.0, -2000.0, 3.5), (540, 10.0, 2000.0, 3.3), (1080, 97.0, 0.0, 3.5)):
         off.update(at(minutes), Reading(soc, power_w=power, cell_high_v=cell))
     assert off.learned_efficiency == pytest.approx(1.0) and off.efficiency == 0.96
+
+
+def learned(config: BatteryConfig, efficiency: float, full_energy_kwh: float, cycles: int) -> Battery:
+    """A battery restored with these learned values (its stored state)."""
+    state = BatteryState(
+        efficiency_in_kwh=100.0,
+        efficiency_out_kwh=100.0 * efficiency,
+        efficiency_cycles=cycles,
+        learned_full_energy_kwh=full_energy_kwh,
+        full_energy_cycles=cycles,
+    )
+    return Battery(config, state_from_dict(state_to_dict(state)))
+
+
+@pytest.mark.parametrize(
+    ("efficiency", "full_energy_kwh", "cycles", "status"),
+    [
+        (0.973, 17.61, 4, LearnedStatus.PENDING),  # fewer than 5 cycles
+        (0.80, 12.0, 4, LearnedStatus.PENDING),  # far, but fewer than 5 cycles
+        (0.973, 17.61, 5, LearnedStatus.READY),  # the real battery's, 2026-11-11
+        (0.96 * 0.9, 17.47 * 1.1, 5, LearnedStatus.READY),  # 10 % away: the bound itself
+        (0.96 * 0.89, 17.47 * 1.11, 5, LearnedStatus.FAR),
+    ],
+)
+def test_a_learned_value_s_status(efficiency: float, full_energy_kwh: float, cycles: int, status: LearnedStatus):
+    b = learned(CONFIG, efficiency, full_energy_kwh, cycles)
+    assert b.efficiency_status is status and b.full_energy_status is status
+
+
+def test_nothing_learned_is_pending():
+    b = battery()
+    assert b.efficiency_status is LearnedStatus.PENDING and b.full_energy_status is LearnedStatus.PENDING
+
+
+def test_a_learned_value_far_from_the_configured_one_is_still_used():
+    # 22 kWh configured for 17.2 learned (-14 %), as on the recording: the learned energy corrects it
+    b = learned(BatteryConfig(22.0, learn=True), 0.85, 17.2, 5)
+    assert b.full_energy_status is LearnedStatus.FAR and b.full_energy_kwh == pytest.approx(17.2)
+    assert b.efficiency_status is LearnedStatus.FAR and b.efficiency == pytest.approx(0.85)  # -11 % from 0.96
 
 
 def test_a_short_or_impossible_cycle_teaches_nothing():

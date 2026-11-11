@@ -5,6 +5,7 @@ doc/agents/model.md)."""
 import math
 from dataclasses import dataclass, field, replace
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from .meter import meter_delta
@@ -57,6 +58,20 @@ MIN_FULL_ENERGY_RATIO, MAX_FULL_ENERGY_RATIO = 0.5, 1.1
 # A learned value replaces the configured one only from this many cycles: one cycle carries the landmarks' spread
 # (an empty landmark 1.05 kWh off on 2026-11-10, after a day without a full charge, against 0.05 to 0.34 before)
 MIN_LEARNED_CYCLES = 5
+# A learned value farther than this from the configured one points at a wrong configuration (a capacity typo, a
+# battery that lost capacity) or a faulty source: the user is told (5 real cycles learned 1.0 % and 0.8 % away from the
+# configured round trip and energy, 2026-11-11). It is still used: refusing it would keep the wrong configuration
+# (on the recording, 22 kWh configured: 1.44 kWh error over the last 3.5 days against 0.99), and a value moving
+# across the bound would switch the energy in use by 2 kWh between two cycles.
+MAX_LEARNED_DEVIATION = 0.1
+
+
+class LearnedStatus(StrEnum):
+    """Where a learned value stands: fewer than MIN_LEARNED_CYCLES, usable, or far from the configured one."""
+
+    PENDING = "pending"
+    READY = "ready"
+    FAR = "far"
 
 
 @dataclass(frozen=True)
@@ -364,17 +379,28 @@ class Battery:
         return self.state.learned_full_energy_kwh
 
     @property
+    def efficiency_status(self) -> LearnedStatus:
+        """Whether the learned round trip can replace the configured one, and how far from it."""
+        return _learned_status(self.learned_efficiency, self.state.efficiency_cycles, self.config.efficiency)
+
+    @property
+    def full_energy_status(self) -> LearnedStatus:
+        return _learned_status(
+            self.state.learned_full_energy_kwh, self.state.full_energy_cycles, self.config.configured_full_energy_kwh
+        )
+
+    @property
     def efficiency(self) -> float:
-        """The round trip in use: the learned one once learning is on and there is one."""
+        """The round trip in use: the learned one once learning is on and no longer pending."""
         learned = self.learned_efficiency
-        if self.config.learn and learned is not None and self.state.efficiency_cycles >= MIN_LEARNED_CYCLES:
+        if self.config.learn and learned is not None and self.efficiency_status is not LearnedStatus.PENDING:
             return learned
         return self.config.efficiency
 
     @property
     def full_energy_kwh(self) -> float:
         learned = self.state.learned_full_energy_kwh
-        if self.config.learn and learned is not None and self.state.full_energy_cycles >= MIN_LEARNED_CYCLES:
+        if self.config.learn and learned is not None and self.full_energy_status is not LearnedStatus.PENDING:
             return learned
         return self.config.configured_full_energy_kwh
 
@@ -627,3 +653,14 @@ def _known_or_finite(value: float | None) -> bool:
 
 def _hours(since: datetime | None, at: datetime) -> float:
     return 0.0 if since is None else max(0.0, (at - since).total_seconds() / 3600.0)
+
+
+def deviation(learned: float, configured: float) -> float:
+    """How far a learned value is from the configured one, as a fraction of it (signed)."""
+    return learned / configured - 1.0
+
+
+def _learned_status(learned: float | None, cycles: int, configured: float) -> LearnedStatus:
+    if learned is None or cycles < MIN_LEARNED_CYCLES:
+        return LearnedStatus.PENDING
+    return LearnedStatus.FAR if abs(deviation(learned, configured)) > MAX_LEARNED_DEVIATION else LearnedStatus.READY

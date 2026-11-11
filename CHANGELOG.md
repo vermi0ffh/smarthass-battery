@@ -8,8 +8,13 @@ the entities; such a change is described here, with what to do.
 - **Options**: *Use the learned values* is on by default for a new battery, and the learned values replace the
   configured ones from 5 cycles instead of 3 (one cycle can be 1 kWh off). Validated on the recording and on 5 real
   cycles (round trip 97.3 % learned, energy between the landmarks 17.61 kWh, both close to the measures).
-- **Upgrade**: a battery added before keeps its setting; turn *Use the learned values* on in its options to count
-  them. With it already on, the configured values come back until 5 cycles are learned (all of them so far count).
+- **Repairs**: *Settings* > *Repairs* says when the learned values are ready while *Use the learned values* is off
+  (one click turns it on), and when a learned value is more than 10 % away from the configured one (a
+  configuration error, a battery that lost capacity, or a source counting wrong). A far value is still used with
+  learning on: it corrects the configuration.
+- **Upgrade**: a battery added before keeps its setting; turn *Use the learned values* on in its options, or from
+  the repair once the values are ready, to count them. With it already on, the configured values come back until 5
+  cycles are learned (all of them so far count).
 
 ## 0.2.0 (2026-11-10)
 

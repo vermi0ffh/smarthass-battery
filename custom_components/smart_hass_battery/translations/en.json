@@ -263,6 +263,28 @@
     "missing_cell_voltage_entities": {
       "title": "The cell voltage of {name} no longer exists",
       "description": "The cell voltage {entity} of the battery {name} no longer exists (renamed, or its device removed): the full landmark is no longer seen. To choose its replacement or remove it, reconfigure the battery: *Settings* > *Devices & services* > *Smart Hass - Battery* > ⋮ > *Reconfigure*."
+    },
+    "learned_values_ready": {
+      "title": "The learned values of {name} are ready",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Use the learned values of {name}",
+            "description": "Measured on the cycles of the battery {name}: a round trip of {efficiency} % (configured: {configured_efficiency} %) and {full_energy} kWh between the landmarks (configured: {configured_full_energy} kWh). Counted in place of the configured values, they follow the battery as it ages. Submit to turn *Use the learned values* on (it can be turned off in the options: *Settings* > *Devices & services* > *Smart Hass - Battery* > *Configure*)."
+          }
+        },
+        "abort": {
+          "entry_not_found": "The battery no longer exists."
+        }
+      }
+    },
+    "learned_efficiency_far": {
+      "title": "The learned round trip of {name} is far from the configured one",
+      "description": "The round trip learned on the cycles of the battery {name} is {efficiency} %, {deviation} % from the configured {configured_efficiency} %. With *Use the learned values* on, the estimate counts the learned one. Such a gap is usually a source counting wrong: an energy meter missing flows, a power with the wrong sign, or AC meters in place of the battery's DC ones. If the learned value is right, set it as the round trip in the options (*Settings* > *Devices & services* > *Smart Hass - Battery* > *Configure*) to clear this issue."
+    },
+    "learned_full_energy_far": {
+      "title": "The learned energy of {name} is far from the configured one",
+      "description": "The energy between the landmarks learned on the cycles of the battery {name} is {full_energy} kWh, {deviation} % from the configured {configured_full_energy} kWh. With *Use the learned values* on, the estimate counts the learned one. Such a gap is usually a configuration error (the nominal capacity, the empty threshold), a battery that lost capacity, or a source counting wrong. If the learned value is right, set it as the energy between the landmarks in the options (*Settings* > *Devices & services* > *Smart Hass - Battery* > *Configure*) to clear this issue."
     }
   }
 }

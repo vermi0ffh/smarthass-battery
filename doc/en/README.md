@@ -19,7 +19,9 @@ It only reads and estimates: it never drives the inverter or the battery.
   what will come out).
 - **Learning**: from one landmark to the next of the same kind, what came out over what went in is the round trip;
   from one kind to the other, the energy between them. Both are always measured (diagnostic sensors); they replace
-  the configured values once *Use the learned values* is on (the default), from 5 cycles.
+  the configured values once *Use the learned values* is on (the default), from 5 cycles. *Settings* > *Repairs*
+  says when they are ready while the option is off (one click turns it on), and when one is more than 10 % away
+  from the configured value (a configuration error, a battery that lost capacity, or a source counting wrong).
 - **Start**: before the first landmark, the estimate starts from the state of charge, and starts from it again if
   the counting drifts more than 3 kWh away from it.
 
@@ -188,6 +190,7 @@ or a set energy), the source entities.
 | The energy moves the wrong way | The power's sign: *Power positive while discharging* in the reconfiguration |
 | The full landmark is never seen | The cell voltages and the full cell voltage: a cell must reach it at the top of the charge |
 | It jumps back to the state of charge | The counting drifted more than 3 kWh from it: a wrong round trip, capacity or power sign, or flows missed |
+| A learned value is far from the configured one (*Repairs*) | The nominal capacity and the empty threshold, then the sources (DC meters, the power's sign); if the learned value is right, set it in the options |
 
 To report a problem, attach the **diagnostics** (*Settings* > *Devices & services* > *Smart Hass - Battery* > the
 battery > ⋮ > *Download diagnostics*): the options, the estimate, the model's state and what each source entity

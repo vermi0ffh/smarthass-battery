@@ -3,7 +3,7 @@
 ## Layers
 
 ```
-model/  ←  tracker.py  ←  sensor.py, diagnostics.py, __init__.py (setup, services), config_flow.py
+model/  ←  tracker.py  ←  sensor.py, diagnostics.py, __init__.py (setup, services), config_flow.py, repairs.py
 ```
 
 - **`model/`** (pure Python, rule 1): `battery.py` (`BatteryConfig`, `Reading`, `BatteryState`, `Battery`: the
@@ -18,12 +18,14 @@ model/  ←  tracker.py  ←  sensor.py, diagnostics.py, __init__.py (setup, ser
   persists its state, and notifies the entities.
 - **`__init__.py`**: setup and unload of an entry (the tracker's stop registered with `async_on_unload`: it also
   runs when the setup fails after the tracker started), the services (registered once in `async_setup`, refused with a
-  translated error for an unknown entry, `set_energy` refusing a non-finite value), the stored state removed with
-  the entry.
+  translated error for an unknown entry, `set_energy` refusing a non-finite value), the stored state and the
+  learning's repair issues removed with the entry.
 - **`config_flow.py`**: the user step (name, sources, battery), `reconfigure` (the sources only; the battery and the
   estimate stay), the options (the battery only). Unique id: the state of charge entity. Errors: neither a power nor
   both meters (`no_flow_source`), one meter alone (`one_meter`), an energy between the landmarks above the nominal
   capacity (`full_energy_above_capacity`).
+- **`repairs.py`**: the fix flow of `learned_values_ready` (`TurnLearningOnFlow`): confirmed, `learn` on in the
+  entry's options and the entry reloaded.
 - **The platforms** (`sensor.py`) only expose the tracker's values; `diagnostics.py` the options, the estimate, the
   stored state and the source entities' states.
 
@@ -41,6 +43,24 @@ an entity that no longer exists raises a repair issue (`missing_<key>`), an erro
 (the power without meters, a meter without power), a warning otherwise; it is deleted when the source reads again
 and at unload. The estimate's entities are unavailable while the flows are unknown: the power unreadable (unless
 both meters read), or a meter unreadable without a power.
+
+## Learning issues
+
+`BatteryTracker` at every change (`_learning_issues_now`, then `_update_learning_issues` syncs the registry), from
+the model's `efficiency_status` and `full_energy_status` (see [model.md](model.md#learning)), each value on its own
+(one can be learned without the other); warnings, one of each per entry (`<key>_<entry_id>`):
+
+| Issue | When | Fix |
+|-------|------|-----|
+| `learned_values_ready` | Learning off and both learned values `ready` | Fixable: turns `learn` on (`repairs.py`; aborts with `entry_not_found` if the battery was deleted meanwhile) |
+| `learned_efficiency_far` | The learned round trip `far` (learning on or off) | Not fixable: the configuration or a source to check |
+| `learned_full_energy_far` | The learned energy between the landmarks `far` | Same |
+
+Placeholders: the name, the learned and configured values the issue is about (both for `learned_values_ready`),
+and the deviation in % for a `far` one. An issue is
+updated while its condition holds (the registry keeps an ignored issue ignored) and deleted only once it ends —
+never at unload: deleting it would bring an ignored one back at every restart. They go with the entry
+(`async_remove_entry`).
 
 ## Persistence
 

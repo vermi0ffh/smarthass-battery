@@ -263,6 +263,28 @@
     "missing_cell_voltage_entities": {
       "title": "La tension de cellule de {name} n'existe plus",
       "description": "La tension de cellule {entity} de la batterie {name} n'existe plus (entité renommée, ou son appareil supprimé) : le repère plein n'est plus vu. Pour choisir son remplacement ou la retirer, reconfigurez la batterie : *Paramètres* > *Appareils et services* > *Smart Hass - Battery* > ⋮ > *Reconfigurer*."
+    },
+    "learned_values_ready": {
+      "title": "Les valeurs apprises de {name} sont prêtes",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Utiliser les valeurs apprises de {name}",
+            "description": "Mesurées sur les cycles de la batterie {name} : un rendement aller-retour de {efficiency} % (configuré : {configured_efficiency} %) et {full_energy} kWh entre les repères (configuré : {configured_full_energy} kWh). Comptées à la place des valeurs configurées, elles suivent la batterie quand elle vieillit. Validez pour activer *Utiliser les valeurs apprises* (désactivable dans les options : *Paramètres* > *Appareils et services* > *Smart Hass - Battery* > *Configurer*)."
+          }
+        },
+        "abort": {
+          "entry_not_found": "La batterie n'existe plus."
+        }
+      }
+    },
+    "learned_efficiency_far": {
+      "title": "Le rendement appris de {name} est loin du rendement configuré",
+      "description": "Le rendement aller-retour appris sur les cycles de la batterie {name} est de {efficiency} %, à {deviation} % des {configured_efficiency} % configurés. Avec *Utiliser les valeurs apprises* activé, l'estimation compte celui appris. Un tel écart vient le plus souvent d'une source qui compte mal : un compteur d'énergie qui manque des flux, une puissance dans le mauvais sens, ou des compteurs AC à la place des compteurs DC de la batterie. Si la valeur apprise est juste, donnez-la comme rendement dans les options (*Paramètres* > *Appareils et services* > *Smart Hass - Battery* > *Configurer*) pour faire disparaître ce problème."
+    },
+    "learned_full_energy_far": {
+      "title": "L'énergie apprise de {name} est loin de l'énergie configurée",
+      "description": "L'énergie entre les repères apprise sur les cycles de la batterie {name} est de {full_energy} kWh, à {deviation} % des {configured_full_energy} kWh configurés. Avec *Utiliser les valeurs apprises* activé, l'estimation compte celle apprise. Un tel écart vient le plus souvent d'une erreur de configuration (la capacité nominale, le seuil vide), d'une batterie qui a perdu de la capacité, ou d'une source qui compte mal. Si la valeur apprise est juste, donnez-la comme énergie entre les repères dans les options (*Paramètres* > *Appareils et services* > *Smart Hass - Battery* > *Configurer*) pour faire disparaître ce problème."
     }
   }
 }

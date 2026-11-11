@@ -20,6 +20,9 @@ Elle lit et estime seulement : elle ne pilote jamais l'onduleur ni la batterie.
 - **Apprentissage** : d'un repère au suivant du même type, ce qui est sorti sur ce qui est entré est le rendement ;
   d'un type à l'autre, l'énergie entre eux. Les deux sont toujours mesurés (capteurs de diagnostic) ; ils remplacent
   les valeurs configurées une fois *Utiliser les valeurs apprises* activé (par défaut), dès 5 cycles.
+  *Paramètres* > *Réparations* signale quand elles sont prêtes alors que l'option est désactivée (un clic l'active),
+  et quand l'une s'écarte de plus de 10 % de la valeur configurée (une erreur de configuration, une batterie qui a
+  perdu de la capacité, ou une source qui compte mal).
 - **Départ** : avant le premier repère, l'estimation part de l'état de charge, et en repart si le comptage s'en
   écarte de plus de 3 kWh.
 
@@ -191,6 +194,7 @@ de charge ou d'une énergie donnée), les entités sources.
 | L'énergie bouge dans le mauvais sens | Le signe de la puissance : *Puissance positive en décharge* dans la reconfiguration |
 | Le repère plein n'est jamais vu | Les tensions des cellules et la tension de cellule pleine : une cellule doit l'atteindre en haut de charge |
 | Elle revient à l'état de charge | Le comptage s'en est écarté de plus de 3 kWh : un rendement, une capacité ou un signe de puissance faux, ou des flux manqués |
+| Une valeur apprise est loin de la valeur configurée (*Réparations*) | La capacité nominale et le seuil vide, puis les sources (compteurs DC, signe de la puissance) ; si la valeur apprise est juste, donnez-la dans les options |
 
 Pour signaler un problème, joignez les **diagnostics** (*Paramètres* > *Appareils et services* > *Smart Hass -
 Battery* > la batterie > ⋮ > *Télécharger les diagnostics*) : les options, l'estimation, l'état du modèle et ce que
