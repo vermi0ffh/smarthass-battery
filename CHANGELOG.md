@@ -3,7 +3,7 @@
 Versions follow [semantic versioning](https://semver.org/). Before 1.0.0, a minor version may change the options or
 the entities; such a change is described here, with what to do.
 
-## Unreleased
+## 0.3.0 (2026-11-11)
 
 - **Options**: *Use the learned values* is on by default for a new battery, and the learned values replace the
   configured ones from 5 cycles instead of 3 (one cycle can be 1 kWh off). Validated on the recording and on 5 real
