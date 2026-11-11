@@ -33,7 +33,7 @@
           "efficiency_pct": "What comes out of the battery for what went in (DC), until one is learned.",
           "full_energy_kwh": "Optional: the energy the battery delivers from full to the empty threshold. Without it, the nominal capacity above the empty threshold.",
           "max_power_kw": "A meter increase faster than this is a spurious value.",
-          "learn": "Count the round trip and the energy between the landmarks learned on the cycles in place of the values above, from 3 cycles. Learned in any case (the diagnostic sensors)."
+          "learn": "Count the round trip and the energy between the landmarks learned on the cycles in place of the values above, from 5 cycles. Learned in any case (the diagnostic sensors)."
         }
       },
       "reconfigure": {
@@ -88,7 +88,7 @@
           "efficiency_pct": "What comes out of the battery for what went in (DC), until one is learned.",
           "full_energy_kwh": "Optional: the energy the battery delivers from full to the empty threshold. Without it, the nominal capacity above the empty threshold.",
           "max_power_kw": "A meter increase faster than this is a spurious value.",
-          "learn": "Count the round trip and the energy between the landmarks learned on the cycles in place of the values above, from 3 cycles. Learned in any case (the diagnostic sensors)."
+          "learn": "Count the round trip and the energy between the landmarks learned on the cycles in place of the values above, from 5 cycles. Learned in any case (the diagnostic sensors)."
         }
       }
     },

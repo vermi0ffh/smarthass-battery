@@ -33,7 +33,7 @@
           "efficiency_pct": "Ce qui sort de la batterie pour ce qui est entré (DC), tant qu'aucun n'est appris.",
           "full_energy_kwh": "Facultatif : l'énergie que la batterie rend de plein jusqu'au seuil vide. Sans elle, la capacité nominale au-dessus du seuil vide.",
           "max_power_kw": "Une hausse de compteur plus rapide que cela est une valeur aberrante.",
-          "learn": "Compter le rendement et l'énergie entre les repères appris sur les cycles à la place des valeurs ci-dessus, dès 3 cycles. Appris dans tous les cas (les capteurs de diagnostic)."
+          "learn": "Compter le rendement et l'énergie entre les repères appris sur les cycles à la place des valeurs ci-dessus, dès 5 cycles. Appris dans tous les cas (les capteurs de diagnostic)."
         }
       },
       "reconfigure": {
@@ -88,7 +88,7 @@
           "efficiency_pct": "Ce qui sort de la batterie pour ce qui est entré (DC), tant qu'aucun n'est appris.",
           "full_energy_kwh": "Facultatif : l'énergie que la batterie rend de plein jusqu'au seuil vide. Sans elle, la capacité nominale au-dessus du seuil vide.",
           "max_power_kw": "Une hausse de compteur plus rapide que cela est une valeur aberrante.",
-          "learn": "Compter le rendement et l'énergie entre les repères appris sur les cycles à la place des valeurs ci-dessus, dès 3 cycles. Appris dans tous les cas (les capteurs de diagnostic)."
+          "learn": "Compter le rendement et l'énergie entre les repères appris sur les cycles à la place des valeurs ci-dessus, dès 5 cycles. Appris dans tous les cas (les capteurs de diagnostic)."
         }
       }
     },

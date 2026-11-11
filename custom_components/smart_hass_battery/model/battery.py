@@ -55,7 +55,8 @@ FULL_ENERGY_WEIGHT = 0.3
 MIN_EFFICIENCY, MAX_EFFICIENCY = 0.85, 1.05
 MIN_FULL_ENERGY_RATIO, MAX_FULL_ENERGY_RATIO = 0.5, 1.1
 # A learned value replaces the configured one only from this many cycles: one cycle carries the landmarks' spread
-MIN_LEARNED_CYCLES = 3
+# (an empty landmark 1.05 kWh off on 2026-11-10, after a day without a full charge, against 0.05 to 0.34 before)
+MIN_LEARNED_CYCLES = 5
 
 
 @dataclass(frozen=True)
@@ -76,8 +77,8 @@ class BatteryConfig:
     # without, the meters count them
     has_power: bool = True
     has_meters: bool = False
-    # The learned efficiency and full energy replace the configured ones once there are some (rule 25: off until
-    # validated)
+    # The learned efficiency and full energy replace the configured ones once there are some (the integration turns it
+    # on for a new battery, DEFAULT_LEARN)
     learn: bool = False
     # The battery's DC flow never exceeds this: a meter increase faster than it is a spurious value. 30 kW: above any
     # home battery

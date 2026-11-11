@@ -82,8 +82,21 @@ async def test_config_flow_creates_the_entry(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.FORM
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"name": "Battery", **OPTIONS})
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Battery" and result["options"] == OPTIONS
+    # Learning on unless unticked (since 0.3.0)
+    assert result["title"] == "Battery" and result["options"] == {**OPTIONS, "learn": True}
     assert result["result"].unique_id == SOC
+    assert hass.states.get("sensor.battery_learned_round_trip").attributes["learning_enabled"] is True
+
+
+async def test_a_battery_added_before_keeps_learning_off(hass: HomeAssistant) -> None:
+    entry = await _setup(hass)  # saved without the option
+    assert hass.states.get("sensor.battery_learned_round_trip").attributes["learning_enabled"] is False
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    learn = next(key for key in result["data_schema"].schema if key == "learn")
+    assert learn.default() is False
+    result = await hass.config_entries.options.async_configure(result["flow_id"], BATTERY)
+    await hass.async_block_till_done()
+    assert entry.options["learn"] is False
 
 
 @pytest.mark.parametrize(

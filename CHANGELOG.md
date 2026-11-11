@@ -3,6 +3,14 @@
 Versions follow [semantic versioning](https://semver.org/). Before 1.0.0, a minor version may change the options or
 the entities; such a change is described here, with what to do.
 
+## Unreleased
+
+- **Options**: *Use the learned values* is on by default for a new battery, and the learned values replace the
+  configured ones from 5 cycles instead of 3 (one cycle can be 1 kWh off). Validated on the recording and on 5 real
+  cycles (round trip 97.3 % learned, energy between the landmarks 17.61 kWh, both close to the measures).
+- **Upgrade**: a battery added before keeps its setting; turn *Use the learned values* on in its options to count
+  them. With it already on, the configured values come back until 5 cycles are learned (all of them so far count).
+
 ## 0.2.0 (2026-11-10)
 
 - **Entities**: the stored energy's `last_full_at` and `last_empty_at` attributes (and the diagnostics): when the

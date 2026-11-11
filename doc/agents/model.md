@@ -74,7 +74,9 @@ complete when it started at a landmark seen and every flow of it was seen).
   `efficiency × in − out`) or delivered (full → empty: `out − efficiency × in`) is the energy between the
   landmarks; it moves 30 % toward each new cycle's (`FULL_ENERGY_WEIGHT`), within 0.5–1.1 times the configured one.
 - `learned_efficiency` and `learned_full_energy_kwh` are always measured; they replace the configured values only
-  with `learn` on (rule 25) and from 3 cycles (`MIN_LEARNED_CYCLES`).
+  with `learn` on and from 5 cycles (`MIN_LEARNED_CYCLES`: one cycle can be 1 kWh off). `learn` is on for a
+  battery added from 0.3.0 (`DEFAULT_LEARN`, rule 25: validated on the recording and on 5 real cycles); an entry
+  saved without it keeps it off.
 
 A landmark told by the user (`mark_full`, `mark_empty`) ends and starts no learned cycle; `set_energy` restarts the
 counting but not the cycles (the flows are still seen).
@@ -112,8 +114,9 @@ in times the recording's round trip, 0.964). With the defaults:
 | Counting since the landmarks | 0.43 kWh | 1.09 | +0.02 | +0.07 |
 
 Learning on brings nothing on this battery (its defaults are close: 0.96 configured, 0.965 learned; 17.47 kWh
-configured, 17.2 learned); from a wrong configuration (22 kWh, round trip 0.92) it learns 0.964 and 17.2 kWh and
-halves the error of the last 3.5 days (0.80 kWh against 1.52).
+configured, 17.2 learned): 0.46 kWh average error against 0.43. From a wrong configuration (22 kWh, round trip 0.92)
+it learns 0.964 and 17.2 kWh, in use from 11-03 and 11-06 (5 cycles), and cuts the error of the last 3.5 days by a
+third (0.99 kWh against 1.52); from 3 cycles it was 0.80, but a single cycle 1 kWh off would then weigh in.
 
 ## Not modeled yet
 

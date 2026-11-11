@@ -271,13 +271,17 @@ def test_the_round_trip_and_the_full_energy_learned_on_cycles():
     assert b.full_energy_kwh == b.learned_full_energy_kwh
 
 
-def test_a_learned_value_is_used_only_from_three_cycles_and_with_learning_on():
+def test_a_learned_value_is_used_only_from_five_cycles_and_with_learning_on():
     b = battery(BatteryConfig(19.2, learn=True), soc_pct=97.0)
+    # Full, 18 kWh out for 9 h, empty, 18 kWh in for 9 h, full again: a round trip of 1 each time
     b.update(at(0), Reading(97.0, power_w=-2000.0, cell_high_v=3.5))
-    b.update(at(540), Reading(10.0, power_w=2000.0, cell_high_v=3.3))
-    b.update(at(1080), Reading(97.0, power_w=0.0, cell_high_v=3.5))
-    assert b.learned_efficiency == pytest.approx(1.0)
-    assert b.efficiency == 0.96
+    for cycle in range(5):
+        assert b.efficiency == 0.96
+        b.update(at(1080 * cycle + 540), Reading(10.0, power_w=2000.0, cell_high_v=3.3))
+        b.update(at(1080 * cycle + 1080), Reading(97.0, power_w=-2000.0, cell_high_v=3.5))
+        assert b.learned_efficiency == pytest.approx(1.0)
+    # The fifth cycle: the learned round trip in use
+    assert b.efficiency == pytest.approx(1.0)
     off = battery(BatteryConfig(19.2), soc_pct=97.0)
     for minutes, soc, power, cell in ((0, 97.0, -2000.0, 3.5), (540, 10.0, 2000.0, 3.3), (1080, 97.0, 0.0, 3.5)):
         off.update(at(minutes), Reading(soc, power_w=power, cell_high_v=cell))

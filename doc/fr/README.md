@@ -19,7 +19,7 @@ Elle lit et estime seulement : elle ne pilote jamais l'onduleur ni la batterie.
   l'entrée : l'estimation est ce qui ressortira).
 - **Apprentissage** : d'un repère au suivant du même type, ce qui est sorti sur ce qui est entré est le rendement ;
   d'un type à l'autre, l'énergie entre eux. Les deux sont toujours mesurés (capteurs de diagnostic) ; ils remplacent
-  les valeurs configurées une fois *Utiliser les valeurs apprises* activé, dès 3 cycles.
+  les valeurs configurées une fois *Utiliser les valeurs apprises* activé (par défaut), dès 5 cycles.
 - **Départ** : avant le premier repère, l'estimation part de l'état de charge, et en repart si le comptage s'en
   écarte de plus de 3 kWh.
 
@@ -58,7 +58,7 @@ services → Ajouter une intégration*.
 | Rendement aller-retour | 96 % | Énergie DC sortie pour l'énergie entrée (96,4 % mesuré sur 8 cycles journaliers en LFP) |
 | Énergie entre les repères | la capacité nominale au-dessus du seuil vide | Ce que la batterie rend de pleine à vide |
 | Puissance maximale | 30 kW | Une hausse de compteur plus rapide est ignorée comme aberrante |
-| Utiliser les valeurs apprises | désactivé | Compter le rendement et l'énergie appris à la place des deux ci-dessus |
+| Utiliser les valeurs apprises | activé | Compter le rendement et l'énergie appris à la place des deux ci-dessus |
 
 Les paramètres de la batterie se changent ensuite (*Configurer* sur l'intégration), les entités lues en la
 reconfigurant (*Reconfigurer* dans son menu) : l'estimation reste, des compteurs remplacés sont comptés depuis leur
