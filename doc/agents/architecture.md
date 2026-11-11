@@ -46,16 +46,18 @@ both meters read), or a meter unreadable without a power.
 
 ## Learning issues
 
-`BatteryTracker._follow_learning`, at every change, from the model's `efficiency_status` and `full_energy_status`
-(see [model.md](model.md#learning)); warnings, one of each per entry (`<key>_<entry_id>`):
+`BatteryTracker` at every change (`_learning_issues_now`, then `_update_learning_issues` syncs the registry), from
+the model's `efficiency_status` and `full_energy_status` (see [model.md](model.md#learning)), each value on its own
+(one can be learned without the other); warnings, one of each per entry (`<key>_<entry_id>`):
 
 | Issue | When | Fix |
 |-------|------|-----|
-| `learned_values_ready` | Learning off and both learned values `ready` | Fixable: turns `learn` on (`repairs.py`) |
+| `learned_values_ready` | Learning off and both learned values `ready` | Fixable: turns `learn` on (`repairs.py`; aborts with `entry_not_found` if the battery was deleted meanwhile) |
 | `learned_efficiency_far` | The learned round trip `far` (learning on or off) | Not fixable: the configuration or a source to check |
 | `learned_full_energy_far` | The learned energy between the landmarks `far` | Same |
 
-Placeholders: the name, both learned and configured values (and the deviation in % for a `far` one). An issue is
+Placeholders: the name, the learned and configured values the issue is about (both for `learned_values_ready`),
+and the deviation in % for a `far` one. An issue is
 updated while its condition holds (the registry keeps an ignored issue ignored) and deleted only once it ends —
 never at unload: deleting it would bring an ignored one back at every restart. They go with the entry
 (`async_remove_entry`).

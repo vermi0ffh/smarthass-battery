@@ -77,8 +77,9 @@ complete when it started at a landmark seen and every flow of it was seen).
   with `learn` on and from 5 cycles (`MIN_LEARNED_CYCLES`: one cycle can be 1 kWh off). `learn` is on for a
   battery added from 0.3.0 (`DEFAULT_LEARN`, rule 25: validated on the recording and on 5 real cycles); an entry
   saved without it keeps it off.
-- `efficiency_status` / `full_energy_status`: `pending` (fewer than 5 cycles), `ready`, or `far` — more than 10 %
-  (`MAX_LEARNED_DEVIATION`) from the configured value (5 real cycles: 1.0 % and 0.8 %). A `far` value is still
+- `efficiency_status` / `full_energy_status` (`LearnedStatus`): `pending` (nothing learned or fewer than 5 cycles),
+  `ready`, or `far` — more than 10 %
+  (`MAX_LEARNED_DEVIATION`, `deviation()`) from the configured value (5 real cycles: 1.0 % and 0.8 %). A `far` value is still
   used with `learn` on: refusing it keeps a wrong configuration (on the recording, 22 kWh configured: 1.44 kWh
   error over the last 3.5 days against 0.99), and a value moving across the bound would switch the energy in use
   by 2 kWh between two cycles; the tracker raises a repair issue instead ([architecture.md](architecture.md#learning-issues)).

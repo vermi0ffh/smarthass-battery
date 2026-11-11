@@ -6,14 +6,12 @@ import pytest
 
 from custom_components.smart_hass_battery.model.battery import (
     EMPTY,
-    FAR,
     FULL,
-    PENDING,
-    READY,
     STATE_VERSION,
     Battery,
     BatteryConfig,
     BatteryState,
+    LearnedStatus,
     Reading,
     state_from_dict,
     state_to_dict,
@@ -303,21 +301,31 @@ def learned(config: BatteryConfig, efficiency: float, full_energy_kwh: float, cy
     return Battery(config, state_from_dict(state_to_dict(state)))
 
 
-def test_a_learned_value_is_pending_then_ready():
-    assert learned(CONFIG, 0.973, 17.61, 4).efficiency_status == PENDING
-    assert learned(CONFIG, 0.973, 17.61, 4).full_energy_status == PENDING
-    b = learned(CONFIG, 0.973, 17.61, 5)
-    assert b.efficiency_status == READY and b.full_energy_status == READY
+@pytest.mark.parametrize(
+    ("efficiency", "full_energy_kwh", "cycles", "status"),
+    [
+        (0.973, 17.61, 4, LearnedStatus.PENDING),  # fewer than 5 cycles
+        (0.80, 12.0, 4, LearnedStatus.PENDING),  # far, but fewer than 5 cycles
+        (0.973, 17.61, 5, LearnedStatus.READY),  # the real battery's, 2026-11-11
+        (0.96 * 0.9, 17.47 * 1.1, 5, LearnedStatus.READY),  # 10 % away: the bound itself
+        (0.96 * 0.89, 17.47 * 1.11, 5, LearnedStatus.FAR),
+    ],
+)
+def test_a_learned_value_s_status(efficiency: float, full_energy_kwh: float, cycles: int, status: LearnedStatus):
+    b = learned(CONFIG, efficiency, full_energy_kwh, cycles)
+    assert b.efficiency_status is status and b.full_energy_status is status
+
+
+def test_nothing_learned_is_pending():
+    b = battery()
+    assert b.efficiency_status is LearnedStatus.PENDING and b.full_energy_status is LearnedStatus.PENDING
 
 
 def test_a_learned_value_far_from_the_configured_one_is_still_used():
     # 22 kWh configured for 17.2 learned (-14 %), as on the recording: the learned energy corrects it
     b = learned(BatteryConfig(22.0, learn=True), 0.85, 17.2, 5)
-    assert b.full_energy_status == FAR and b.full_energy_kwh == pytest.approx(17.2)
-    assert b.efficiency_status == FAR and b.efficiency == pytest.approx(0.85)  # -11 % from 0.96
-    # Within 10 %: ready
-    assert learned(CONFIG, 0.87, 15.8, 5).efficiency_status == READY
-    assert learned(CONFIG, 0.87, 15.8, 5).full_energy_status == READY
+    assert b.full_energy_status is LearnedStatus.FAR and b.full_energy_kwh == pytest.approx(17.2)
+    assert b.efficiency_status is LearnedStatus.FAR and b.efficiency == pytest.approx(0.85)  # -11 % from 0.96
 
 
 def test_a_short_or_impossible_cycle_teaches_nothing():

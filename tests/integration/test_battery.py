@@ -528,16 +528,17 @@ async def test_meters_alone_unavailable_make_the_estimate_unavailable(
 # --- Learning ---
 
 READY_ISSUE, FAR_ISSUE = "learned_values_ready_battery", "learned_full_energy_far_battery"
+EFFICIENCY_FAR_ISSUE = "learned_efficiency_far_battery"
 
 
-def _learned(hass_storage: dict, efficiency: float, full_energy_kwh: float, cycles: int = 6) -> None:
-    """The battery's stored state with these learned values."""
+def _learned(hass_storage: dict, efficiency: float, full_energy_kwh: float | None, cycles: int = 6) -> None:
+    """The battery's stored state with these learned values (None: no energy learned)."""
     state = BatteryState(
         efficiency_in_kwh=100.0,
         efficiency_out_kwh=100.0 * efficiency,
         efficiency_cycles=cycles,
         learned_full_energy_kwh=full_energy_kwh,
-        full_energy_cycles=cycles,
+        full_energy_cycles=0 if full_energy_kwh is None else cycles,
     )
     hass_storage[f"{DOMAIN}.battery"] = {"version": 1, "key": f"{DOMAIN}.battery", "data": state_to_dict(state)}
 
@@ -606,11 +607,61 @@ async def test_a_learned_energy_far_from_the_configured_one_raises_an_issue(
 async def test_a_learned_round_trip_far_from_the_configured_one_raises_an_issue(
     hass: HomeAssistant, hass_storage: dict
 ) -> None:
-    _learned(hass_storage, 0.85, 17.61)  # -11 %
+    _learned(hass_storage, 0.85, None)  # -11 %; the energy between the landmarks not learned yet
+    _measures(hass)
+    entry = await _setup(hass, entry_id="battery")
+    registry = ir.async_get(hass)
+    issue = registry.async_get_issue(DOMAIN, EFFICIENCY_FAR_ISSUE)
+    assert issue is not None and issue.translation_placeholders == {
+        "name": "Battery",
+        "efficiency": "85.0",
+        "configured_efficiency": "96.0",
+        "deviation": "-11",
+    }
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], {**BATTERY, "efficiency_pct": 85.0})
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, EFFICIENCY_FAR_ISSUE) is None
+
+
+async def test_both_learned_values_far_raise_both_issues(hass: HomeAssistant, hass_storage: dict) -> None:
+    _learned(hass_storage, 0.85, 14.0)
     _measures(hass)
     await _setup(hass, entry_id="battery")
-    issue = ir.async_get(hass).async_get_issue(DOMAIN, "learned_efficiency_far_battery")
-    assert issue is not None and issue.translation_placeholders["deviation"] == "-11"
+    registry = ir.async_get(hass)
+    assert registry.async_get_issue(DOMAIN, EFFICIENCY_FAR_ISSUE) is not None
+    assert registry.async_get_issue(DOMAIN, FAR_ISSUE) is not None
+
+
+async def test_the_ready_issue_goes_once_a_learned_value_is_far(hass: HomeAssistant, hass_storage: dict) -> None:
+    _learned(hass_storage, 0.973, 17.61)
+    _measures(hass)
+    entry = await _setup(hass, entry_id="battery")
+    registry = ir.async_get(hass)
+    assert registry.async_get_issue(DOMAIN, READY_ISSUE) is not None
+    # 85 % configured: the learned 97.3 % is now 14 % above it
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], {**BATTERY, "efficiency_pct": 85.0})
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, READY_ISSUE) is None
+    assert registry.async_get_issue(DOMAIN, EFFICIENCY_FAR_ISSUE) is not None
+
+
+async def test_the_repair_of_a_battery_deleted_meanwhile_turns_nothing_on(
+    hass: HomeAssistant, hass_storage: dict, hass_client: ClientSessionGenerator
+) -> None:
+    assert await async_setup_component(hass, "repairs", {})
+    _learned(hass_storage, 0.973, 17.61)
+    _measures(hass)
+    entry = await _setup(hass, entry_id="battery")
+    client = await hass_client()
+    response = await client.post("/api/repairs/issues/fix", json={"handler": DOMAIN, "issue_id": READY_ISSUE})
+    flow = await response.json()
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    response = await client.post(f"/api/repairs/issues/fix/{flow['flow_id']}", json={})
+    result = await response.json()
+    assert result["type"] == "abort" and result["reason"] == "entry_not_found"
 
 
 async def test_an_ignored_learning_issue_stays_ignored_and_goes_with_the_battery(

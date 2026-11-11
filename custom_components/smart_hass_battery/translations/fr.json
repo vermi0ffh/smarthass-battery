@@ -272,6 +272,9 @@
             "title": "Utiliser les valeurs apprises de {name}",
             "description": "Mesurées sur les cycles de la batterie {name} : un rendement aller-retour de {efficiency} % (configuré : {configured_efficiency} %) et {full_energy} kWh entre les repères (configuré : {configured_full_energy} kWh). Comptées à la place des valeurs configurées, elles suivent la batterie quand elle vieillit. Validez pour activer *Utiliser les valeurs apprises* (désactivable dans les options : *Paramètres* > *Appareils et services* > *Smart Hass - Battery* > *Configurer*)."
           }
+        },
+        "abort": {
+          "entry_not_found": "La batterie n'existe plus."
         }
       }
     },

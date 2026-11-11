@@ -272,6 +272,9 @@
             "title": "Use the learned values of {name}",
             "description": "Measured on the cycles of the battery {name}: a round trip of {efficiency} % (configured: {configured_efficiency} %) and {full_energy} kWh between the landmarks (configured: {configured_full_energy} kWh). Counted in place of the configured values, they follow the battery as it ages. Submit to turn *Use the learned values* on (it can be turned off in the options: *Settings* > *Devices & services* > *Smart Hass - Battery* > *Configure*)."
           }
+        },
+        "abort": {
+          "entry_not_found": "The battery no longer exists."
         }
       }
     },

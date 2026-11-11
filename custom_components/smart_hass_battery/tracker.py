@@ -38,7 +38,7 @@ from .const import (
     FOLLOWED_KEYS,
     METER_KEYS,
 )
-from .model import FAR, READY, Battery, BatteryConfig, Reading, state_from_dict, state_to_dict
+from .model import Battery, BatteryConfig, LearnedStatus, Reading, deviation, state_from_dict, state_to_dict
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -337,29 +337,46 @@ class BatteryTracker:
     def _issue_id(self, key: str) -> str:
         return f"missing_{key}_{self.entry.entry_id}"
 
-    def _follow_learning(self) -> None:
-        """Repair issues: the learned values ready while learning is off (fixable: turns it on, repairs.py); a learned
-        value far from the configured one (the configuration or a source to check). Updated while true and deleted
-        only once false, never at a restart: an issue the user ignored stays ignored."""
+    def _learning_issues_now(self) -> dict[str, dict[str, str]]:
+        """The learning's repair issues true now, with their placeholders: the learned values ready while learning is
+        off (fixable: turns it on, repairs.py); a learned value far from the configured one (the configuration or a
+        source to check), each on its own (one can be learned without the other)."""
         battery, cfg = self.battery, self.battery.config
+        name = self.entry.title
         efficiency, full_energy = battery.learned_efficiency, battery.learned_full_energy_kwh
-        name = {"name": self.entry.title}
-        issues: dict[str, dict[str, str]] = {}
-        if efficiency is not None and full_energy is not None:
-            values = {
+        efficiency_status, full_energy_status = battery.efficiency_status, battery.full_energy_status
+        round_trip = (
+            {}
+            if efficiency is None
+            else {
                 "efficiency": f"{100.0 * efficiency:.1f}",
                 "configured_efficiency": f"{100.0 * cfg.efficiency:.1f}",
+            }
+        )
+        energy = (
+            {}
+            if full_energy is None
+            else {
                 "full_energy": f"{full_energy:.2f}",
                 "configured_full_energy": f"{cfg.configured_full_energy_kwh:.2f}",
             }
-            statuses = (battery.efficiency_status, battery.full_energy_status)
-            if not cfg.learn and statuses == (READY, READY):
-                issues[ISSUE_LEARNED_READY] = {**name, **values}
-            if statuses[0] == FAR:
-                issues[ISSUE_EFFICIENCY_FAR] = {**name, **values, "deviation": _deviation(efficiency, cfg.efficiency)}
-            if statuses[1] == FAR:
-                deviation = _deviation(full_energy, cfg.configured_full_energy_kwh)
-                issues[ISSUE_FULL_ENERGY_FAR] = {**name, **values, "deviation": deviation}
+        )
+        issues: dict[str, dict[str, str]] = {}
+        # FAR and READY have their learned value (None is PENDING)
+        if efficiency is not None and efficiency_status is LearnedStatus.FAR:
+            far = _deviation(efficiency, cfg.efficiency)
+            issues[ISSUE_EFFICIENCY_FAR] = {"name": name, **round_trip, "deviation": far}
+        if full_energy is not None and full_energy_status is LearnedStatus.FAR:
+            far = _deviation(full_energy, cfg.configured_full_energy_kwh)
+            issues[ISSUE_FULL_ENERGY_FAR] = {"name": name, **energy, "deviation": far}
+        if not cfg.learn and efficiency_status is full_energy_status is LearnedStatus.READY:
+            issues[ISSUE_LEARNED_READY] = {"name": name, **round_trip, **energy}
+        return issues
+
+    def _update_learning_issues(self) -> None:
+        """Raises the learning's issues true now and deletes the others. Updated while true and deleted only once
+        false, never at a restart: an issue the user ignored stays ignored."""
+        issues = self._learning_issues_now()
         if issues == self._learning_issues:
             return
         for key in LEARNING_ISSUES:
@@ -380,7 +397,7 @@ class BatteryTracker:
         self._learning_issues = issues
 
     def _changed(self) -> None:
-        self._follow_learning()
+        self._update_learning_issues()
         self._store.async_delay_save(self._stored, SAVE_DELAY_S)
         for listener in list(self._listeners):
             listener()
@@ -437,7 +454,7 @@ def _names(entity_ids: list[str]) -> str:
 
 
 def _deviation(learned: float, configured: float) -> str:
-    return f"{100.0 * (learned / configured - 1.0):+.0f}"
+    return f"{100.0 * deviation(learned, configured):+.0f}"
 
 
 def _round(value: float | None, digits: int) -> float | None:
