@@ -19,6 +19,7 @@ from pytest_homeassistant_custom_component.components.diagnostics import get_dia
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
 from custom_components.smart_hass_battery.const import DOMAIN
+from custom_components.smart_hass_battery.model import BatteryState, state_to_dict
 
 SOC, POWER = "sensor.bms_soc", "sensor.battery_power"
 CHARGED, DISCHARGED = "sensor.battery_energy_in", "sensor.battery_energy_out"
@@ -522,6 +523,111 @@ async def test_meters_alone_unavailable_make_the_estimate_unavailable(
     await hass.async_block_till_done()
     await _later(hass, freezer, timedelta(minutes=16))
     assert hass.states.get(ENERGY).state == "unavailable"
+
+
+# --- Learning ---
+
+READY_ISSUE, FAR_ISSUE = "learned_values_ready_battery", "learned_full_energy_far_battery"
+
+
+def _learned(hass_storage: dict, efficiency: float, full_energy_kwh: float, cycles: int = 6) -> None:
+    """The battery's stored state with these learned values."""
+    state = BatteryState(
+        efficiency_in_kwh=100.0,
+        efficiency_out_kwh=100.0 * efficiency,
+        efficiency_cycles=cycles,
+        learned_full_energy_kwh=full_energy_kwh,
+        full_energy_cycles=cycles,
+    )
+    hass_storage[f"{DOMAIN}.battery"] = {"version": 1, "key": f"{DOMAIN}.battery", "data": state_to_dict(state)}
+
+
+async def test_learned_values_ready_while_learning_is_off_turn_it_on_in_one_repair(
+    hass: HomeAssistant, hass_storage: dict, hass_client: ClientSessionGenerator
+) -> None:
+    assert await async_setup_component(hass, "repairs", {})
+    _learned(hass_storage, 0.973, 17.61)
+    _measures(hass)
+    entry = await _setup(hass, entry_id="battery")  # saved without the option: learning off
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, READY_ISSUE)
+    assert issue is not None and issue.is_fixable and issue.severity is ir.IssueSeverity.WARNING
+    assert issue.translation_placeholders == {
+        "name": "Battery",
+        "efficiency": "97.3",
+        "configured_efficiency": "96.0",
+        "full_energy": "17.61",
+        "configured_full_energy": "17.47",
+    }
+    client = await hass_client()
+    response = await client.post("/api/repairs/issues/fix", json={"handler": DOMAIN, "issue_id": READY_ISSUE})
+    flow = await response.json()
+    assert flow["step_id"] == "confirm"
+    response = await client.post(f"/api/repairs/issues/fix/{flow['flow_id']}", json={})
+    assert (await response.json())["type"] == "create_entry"
+    await hass.async_block_till_done()
+    assert entry.options["learn"] is True
+    learned_round_trip = hass.states.get("sensor.battery_learned_round_trip")
+    assert learned_round_trip.attributes["efficiency_in_use"] == 0.973  # reloaded with it
+    assert ir.async_get(hass).async_get_issue(DOMAIN, READY_ISSUE) is None
+
+
+@pytest.mark.parametrize(
+    ("learn", "cycles"),
+    [(True, 6), (False, 4)],  # learning already on; fewer than 5 cycles
+)
+async def test_no_ready_issue_with_learning_on_or_before_5_cycles(
+    hass: HomeAssistant, hass_storage: dict, learn: bool, cycles: int
+) -> None:
+    _learned(hass_storage, 0.973, 17.61, cycles)
+    _measures(hass)
+    await _setup(hass, {**OPTIONS, "learn": learn}, entry_id="battery")
+    assert not [issue for (domain, _), issue in ir.async_get(hass).issues.items() if domain == DOMAIN]
+
+
+async def test_a_learned_energy_far_from_the_configured_one_raises_an_issue(
+    hass: HomeAssistant, hass_storage: dict
+) -> None:
+    _learned(hass_storage, 0.973, 14.0)  # -20 %: a capacity typo, a battery that lost capacity, a wrong source
+    _measures(hass)
+    entry = await _setup(hass, entry_id="battery")
+    registry = ir.async_get(hass)
+    issue = registry.async_get_issue(DOMAIN, FAR_ISSUE)
+    assert issue is not None and not issue.is_fixable
+    assert issue.translation_placeholders["deviation"] == "-20"
+    # Far, not ready: no offer to count it
+    assert registry.async_get_issue(DOMAIN, READY_ISSUE) is None
+    # Configured as learned: the issue goes
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(result["flow_id"], {**BATTERY, "full_energy_kwh": 14.0})
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, FAR_ISSUE) is None
+
+
+async def test_a_learned_round_trip_far_from_the_configured_one_raises_an_issue(
+    hass: HomeAssistant, hass_storage: dict
+) -> None:
+    _learned(hass_storage, 0.85, 17.61)  # -11 %
+    _measures(hass)
+    await _setup(hass, entry_id="battery")
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "learned_efficiency_far_battery")
+    assert issue is not None and issue.translation_placeholders["deviation"] == "-11"
+
+
+async def test_an_ignored_learning_issue_stays_ignored_and_goes_with_the_battery(
+    hass: HomeAssistant, hass_storage: dict
+) -> None:
+    _learned(hass_storage, 0.973, 17.61)
+    _measures(hass)
+    entry = await _setup(hass, entry_id="battery")
+    registry = ir.async_get(hass)
+    ir.async_ignore_issue(hass, DOMAIN, READY_ISSUE, True)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    issue = registry.async_get_issue(DOMAIN, READY_ISSUE)
+    assert issue is not None and issue.dismissed_version is not None
+    await hass.config_entries.async_remove(entry.entry_id)
+    await hass.async_block_till_done()
+    assert registry.async_get_issue(DOMAIN, READY_ISSUE) is None
 
 
 # --- Diagnostics ---

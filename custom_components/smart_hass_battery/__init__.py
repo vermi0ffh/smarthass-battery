@@ -9,6 +9,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
@@ -19,7 +20,7 @@ from .const import (
     SERVICE_MARK_FULL,
     SERVICE_SET_ENERGY,
 )
-from .tracker import BatteryTracker, stored_state
+from .tracker import LEARNING_ISSUES, BatteryTracker, learning_issue_id, stored_state
 
 PLATFORMS = [Platform.SENSOR]
 
@@ -88,5 +89,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: BatteryConfigEntry) -> 
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: BatteryConfigEntry) -> None:
-    """The battery deleted: its stored estimate goes with it."""
+    """The battery deleted: its stored estimate and its learning's repair issues go with it (they outlive an unload)."""
     await stored_state(hass, entry.entry_id).async_remove()
+    for key in LEARNING_ISSUES:
+        ir.async_delete_issue(hass, DOMAIN, learning_issue_id(key, entry.entry_id))

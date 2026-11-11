@@ -84,7 +84,9 @@ rules:
   reconfiguration-flow: done
   repair-issues:
     status: done
-    comment: A source entity that no longer exists for 15 min; the issue tells to reconfigure.
+    comment: >-
+      A source entity that no longer exists for 15 min (the issue tells to reconfigure); the learned values ready
+      while learning is off (a repair turns it on), or far from the configured ones.
   stale-devices:
     status: exempt
     comment: One device per config entry, removed with it.

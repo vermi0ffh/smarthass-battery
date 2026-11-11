@@ -6,7 +6,10 @@ import pytest
 
 from custom_components.smart_hass_battery.model.battery import (
     EMPTY,
+    FAR,
     FULL,
+    PENDING,
+    READY,
     STATE_VERSION,
     Battery,
     BatteryConfig,
@@ -286,6 +289,35 @@ def test_a_learned_value_is_used_only_from_five_cycles_and_with_learning_on():
     for minutes, soc, power, cell in ((0, 97.0, -2000.0, 3.5), (540, 10.0, 2000.0, 3.3), (1080, 97.0, 0.0, 3.5)):
         off.update(at(minutes), Reading(soc, power_w=power, cell_high_v=cell))
     assert off.learned_efficiency == pytest.approx(1.0) and off.efficiency == 0.96
+
+
+def learned(config: BatteryConfig, efficiency: float, full_energy_kwh: float, cycles: int) -> Battery:
+    """A battery restored with these learned values (its stored state)."""
+    state = BatteryState(
+        efficiency_in_kwh=100.0,
+        efficiency_out_kwh=100.0 * efficiency,
+        efficiency_cycles=cycles,
+        learned_full_energy_kwh=full_energy_kwh,
+        full_energy_cycles=cycles,
+    )
+    return Battery(config, state_from_dict(state_to_dict(state)))
+
+
+def test_a_learned_value_is_pending_then_ready():
+    assert learned(CONFIG, 0.973, 17.61, 4).efficiency_status == PENDING
+    assert learned(CONFIG, 0.973, 17.61, 4).full_energy_status == PENDING
+    b = learned(CONFIG, 0.973, 17.61, 5)
+    assert b.efficiency_status == READY and b.full_energy_status == READY
+
+
+def test_a_learned_value_far_from_the_configured_one_is_still_used():
+    # 22 kWh configured for 17.2 learned (-14 %), as on the recording: the learned energy corrects it
+    b = learned(BatteryConfig(22.0, learn=True), 0.85, 17.2, 5)
+    assert b.full_energy_status == FAR and b.full_energy_kwh == pytest.approx(17.2)
+    assert b.efficiency_status == FAR and b.efficiency == pytest.approx(0.85)  # -11 % from 0.96
+    # Within 10 %: ready
+    assert learned(CONFIG, 0.87, 15.8, 5).efficiency_status == READY
+    assert learned(CONFIG, 0.87, 15.8, 5).full_energy_status == READY
 
 
 def test_a_short_or_impossible_cycle_teaches_nothing():
