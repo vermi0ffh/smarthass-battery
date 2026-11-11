@@ -24,8 +24,7 @@ CONF_FULL_CELL_V = "full_cell_v"
 CONF_EFFICIENCY_PCT = "efficiency_pct"
 CONF_FULL_ENERGY_KWH = "full_energy_kwh"
 CONF_MAX_POWER_KW = "max_power_kw"
-# Count the learned round trip and energy between the landmarks in place of the configured ones (off by default:
-# rule 25)
+# Count the learned round trip and energy between the landmarks in place of the configured ones
 CONF_LEARN = "learn"
 
 # The defaults of the model (doc/agents/model.md): 9 % is the threshold where the recorded house's Home Assistant
@@ -35,6 +34,10 @@ DEFAULT_EMPTY_SOC_PCT = 9.0
 DEFAULT_FULL_CELL_V = 3.5
 DEFAULT_EFFICIENCY_PCT = 96.0
 DEFAULT_MAX_POWER_KW = 30.0
+# On for a new battery since 0.3.0 (rule 25: validated on the recording, where it finds the configured values or
+# corrects wrong ones, then on 5 real cycles: 0.973 and 17.61 kWh learned, 0.964 measured and 17.47 configured,
+# 2026-11-11); an entry saved without the option keeps learning off
+DEFAULT_LEARN = True
 
 # Services
 SERVICE_MARK_FULL = "mark_full"

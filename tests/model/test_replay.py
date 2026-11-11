@@ -153,5 +153,5 @@ def test_learning_corrects_a_wrong_configuration(recorded, recorded_flows):
     def late(r: Replay) -> list[float]:
         return [s.estimate_kwh - s.truth_kwh for s in r.samples if s.at >= since]
 
-    # Once learned (from the evening of 11-03): 0.80 kWh against 1.52
+    # Once learned (the round trip from 11-03, the energy between the landmarks from 11-06): 0.99 kWh against 1.52
     assert mae(late(learned)) < 0.7 * mae(late(uncorrected))

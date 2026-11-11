@@ -19,7 +19,7 @@ It only reads and estimates: it never drives the inverter or the battery.
   what will come out).
 - **Learning**: from one landmark to the next of the same kind, what came out over what went in is the round trip;
   from one kind to the other, the energy between them. Both are always measured (diagnostic sensors); they replace
-  the configured values once *Use the learned values* is on, from 3 cycles.
+  the configured values once *Use the learned values* is on (the default), from 5 cycles.
 - **Start**: before the first landmark, the estimate starts from the state of charge, and starts from it again if
   the counting drifts more than 3 kWh away from it.
 
@@ -57,7 +57,7 @@ install **Smart Hass - Battery**, restart Home Assistant, then *Settings → Dev
 | Round trip | 96 % | DC energy out for energy in (96.4 % measured over 8 daily cycles on LFP) |
 | Energy between the landmarks | the nominal capacity above the empty threshold | What the battery delivers from full to empty |
 | Maximum power | 30 kW | A meter increase faster than this is ignored as spurious |
-| Use the learned values | off | Count the learned round trip and energy in place of the two above |
+| Use the learned values | on | Count the learned round trip and energy in place of the two above |
 
 The battery's parameters can be changed later (*Configure* on the integration), the entities read by reconfiguring
 it (*Reconfigure* in its menu): the estimate stays, replaced meters are counted from their first reading.

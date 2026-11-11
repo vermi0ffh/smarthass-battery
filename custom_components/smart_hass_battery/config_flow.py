@@ -26,6 +26,7 @@ from .const import (
     DEFAULT_EFFICIENCY_PCT,
     DEFAULT_EMPTY_SOC_PCT,
     DEFAULT_FULL_CELL_V,
+    DEFAULT_LEARN,
     DEFAULT_MAX_POWER_KW,
     DOMAIN,
     RECONFIGURE_KEYS,
@@ -86,9 +87,7 @@ def _battery_schema(defaults: dict[str, Any]) -> probatio.Schema:
             probatio.Required(
                 CONF_MAX_POWER_KW, default=defaults.get(CONF_MAX_POWER_KW, DEFAULT_MAX_POWER_KW)
             ): _number(0.1, 1000, 0.1, "kW"),
-            probatio.Optional(
-                CONF_LEARN, description={"suggested_value": defaults.get(CONF_LEARN, False)}
-            ): selector.BooleanSelector(),
+            probatio.Optional(CONF_LEARN, default=defaults.get(CONF_LEARN, DEFAULT_LEARN)): selector.BooleanSelector(),
         }
     )
 
@@ -157,5 +156,6 @@ class BatteryOptionsFlow(OptionsFlowWithReload):
         if user_input is not None and not errors:
             sources = {key: value for key, value in self.config_entry.options.items() if key in RECONFIGURE_KEYS}
             return self.async_create_entry(data={**sources, **user_input})
-        defaults = user_input if user_input is not None else dict(self.config_entry.options)
+        # An entry saved without the option learns nothing in use (battery_config): the form shows it so
+        defaults = user_input if user_input is not None else {CONF_LEARN: False, **self.config_entry.options}
         return self.async_show_form(step_id="init", data_schema=_battery_schema(defaults), errors=errors)
